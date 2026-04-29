@@ -1,0 +1,353 @@
+C:\Users\NAVEENNARAYANRAO\Desktop\One-timers\Final Copy\OneTimer Bob
+
+…or create a new repository on the command line
+echo "# OnetimerBob" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/naveenkn-ibm/OnetimerBob.git
+git push -u origin main
+
+…or push an existing repository from the command line
+git remote add origin https://github.com/naveenkn-ibm/OnetimerBob.git
+git branch -M main
+git push -u origin main
+
+https://github.com/naveenkn-ibm/OnetimerBob.git
+
+npm run dev
+
+do not pass the downloaded document for AI to anlaysis
+🐛
+AI analysis error
+request entity too large
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+All 12 fields from MCP are now displayed:
+
+✅ id (used internally)
+✅ key (header)
+✅ summary (title)
+✅ description (new section)
+✅ status (badge)
+✅ issue_type (badge)
+✅ priority (badge)
+✅ assignee (metadata)
+✅ reporter (metadata)
+✅ created (metadata)
+✅ updated (metadata)
+✅ comments (new section)
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Act as a senior full-stack engineer, enterprise UI/UX architect, and backend systems architect with deep expertise in MCP integration, distributed systems, and database design. Additionally, operate with the perspective of:
+	Solution Architect → Design scalable, modular, and cloud-ready system architecture with clear separation of concerns
+	DevOps Engineer → Define CI/CD pipelines, environment configuration, deployment strategy, and monitoring/logging setup
+	Security Engineer → Implement secure authentication flows, credential handling, encryption practices, and compliance-aware design
+	Data Architect → Design efficient schemas, indexing strategies, and data flow pipelines for optimal performance and scalability
+	Integration Specialist → Handle seamless integration with external systems such as mainframes, MCP services, APIs, and third-party platforms (e.g., Jira-like 	systems)
+	Performance Engineer → Optimize frontend and backend for low latency, high throughput, and smooth user experience
+	Enterprise UX Strategist → Ensure the interface follows enterprise usability standards, accessibility, and intuitive workflows
+	QA/Test Engineer → Include test strategies, validation logic, and edge-case handling for production reliability
+During the development and coding process of this project, feel free to switch the Modes as needed to give the desired result. 
+
+Expectations:
+	Think in terms of real-world enterprise deployment, not just a prototype
+	Prioritize scalability, maintainability, and security at every layer
+	Build with extensibility in mind so additional integrations (mainframe, APIs, automation tools) can be added easily
+	Follow industry best practices for architecture, coding standards, and documentation
+
+Design and build a standalone AI-powered, enterprise-grade application that replicates and enhances the IBM BOB experience while demonstrating:
+	As in Bob, use multiturn conversations, meaning to maintain context throughout your conversation.
+	Real-world enterprise usability
+	Seamless system integration (mainframe + APIs)
+	Scalable and secure architecture
+	Exceptional UI/UX quality
+	Ensure pixel-level attention to UI components, layouts, and interaction patterns
+	Suggest implementation steps, providing guidance throughout the project execution process.
+	Match with Bob’s behavior pattern
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+To start with, the application should ask for the TSO Id and password to access the mainframe. Build a responsive web application that enables users to authenticate into an IBM Mainframe system using their TSO credentials. 
+
+Functional Requirements:
+	User Interface (Frontend)
+	Create a clean web page with:
+	Input field for TSO ID
+	Input field for Password (masked)
+	Login / Connect button
+Display a progress bar or loader during authentication.
+Show dynamic status messages inside or near the progress bar indicating each backend step.
+
+Authentication Flow
+When the user clicks “Login”:
+	Initiate connection to the mainframe using the configuration provided in the attached document VSC1.pdf (IP address, port, protocol, etc.).
+	Use secure communication methods.
+	Authenticate using the entered TSO ID and password.
+
+Progress Feedback (Important)
+While authentication is in progress, display step-by-step updates such as...
+	“Initializing connection to mainframe…”
+	“Establishing session…”
+	“Sending credentials…”
+	“Validating user…”
+	“Authentication in progress…”
+Ensure the progress bar visually reflects the stages. Feel free to add more items to the above messages to make it more meaningful. I want to keep the user engaging during this authentication process.
+
+Failure Handling
+If authentication fails:
+	Display clear error messages such as:
+	“Invalid TSO credentials”
+	“Connection timeout”
+	“Mainframe unreachable”
+Allow retry without refreshing the page.
+
+Backend Requirements
+	Implement a backend service to:
+		Read connection details from configuration (based on VSC1.pdf)
+		Handle secure authentication with the mainframe
+	Ensure credentials are not logged or exposed.
+	Use environment variables or secure vault mechanisms to manage sensitive configuration.
+
+Security Considerations
+	Do NOT hardcode credentials.
+	Encrypt communication (HTTPS / secure protocols).
+	Mask password input for the password.. Show a eye icon to unmask the passoword
+	Follow best practices for secure authentication.
+
+Additional Enhancements
+	Suggest and include any required libraries, plugins, or middleware needed for:
+		Mainframe connectivity
+		Secure authentication
+		UI progress indicators
+	Provide setup instructions for dependencies.
+
+Output Expectations:
+	Fully working frontend + backend integration
+	Clear modular code structure
+	Instructions to install dependencies and run the application
+	Configurable connection settings based on VSC1.pdf
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Once authentication is successful, route the user to the main workspace, which is the core of the application. This is Core Workflow Engine (IBM BOB-like Behavior).
+
+User Interaction Flow
+	Provide a chat-style input box where the system waits for user instructions
+	Upon user input:
+		Dynamically generate a structured to-do/task list representing the full execution plan
+		Tasks should be:
+			Editable
+			Approve/reject capable
+			Clearly sequenced
+		Mimic IBM BOB’s behavior for task orchestration
+
+Task Execution Visualization
+	Display tasks with status indicators:
+		🟡 Yellow → In Progress
+		🟢 Green → Completed
+	Update task states in real-time as execution progresses
+	Show step-by-step progression of the system
+
+Chat + System Transparency
+	Use a chat window (like IBM BOB) to:
+		Show live updates of actions being performed
+		Log completed steps
+		Provide contextual explanations of what the system is doing
+	Maintain full transparency of workflow execution
+
+Include a final summary panel that:
+	Explains what was generated
+	Maps outputs to tasks completed
+	Provides quick review insights
+
+Iteration & Multi-Turn Intelligence (CRITICAL)
+Maintain context across conversations (multi-turn interaction)
+	Allow users to:
+		Refine specific outputs
+		Regenerate parts of the workflow
+		Edit tasks and re-run execution
+Provide options like:
+	“Refine this document”
+	“Regenerate this section”
+	“Modify workflow”
+Ensure the system behaves like a true AI assistant that evolves with feedback
+
+Enterprise UI/UX Design
+	Pixel-accurate IBM BOB-inspired interface
+	Dashboard-style layout:
+		Left: Task workflow panel
+		Center: Deliverables/output view
+		Right/Bottom: Chat + system logs
+	Clean typography, spacing, and hierarchy
+	Smooth animations and transitions
+	Fully responsive
+
+Backend & System Architecture
+API-first design
+Modular services:
+	Authentication Service
+	Workflow Engine
+	Task Orchestrator
+	Deliverables Generator
+	Integration Layer (MCP / Mainframe)
+Logging, retries, and error handling
+
+Database & Data Layer
+Store:
+	Users
+	Sessions
+	Tasks
+	Conversations
+	Generated outputs
+Efficient schema design with scalability
+
+Integration Layer (HIGH IMPACT)
+	MCP integration-ready
+	Clearly visualize data flow
+
+
+Functional Flow: Healthcare Claims Processing (US Healthcare project which process and work healthcare claims)
+
+Step 1:
+User Input Layer
+	Prompt the User to enter the CSR / Issue Id / Ticket number. The user enters a CSR / Issue ID / Ticket Number in the chat input area.
+	This input acts as the primary trigger for the workflow engine
+
+Integration Layer (Jira via MCP)
+	On submission:
+		Initiate a secure connection to Jira via MCP (Model Context Protocol)
+		Authenticate using enterprise credentials (handled securely, not hardcoded)
+		Connect to Jira through MCP and pull all the requirements. Display that on the main panel (as in IBM BOB Panel). This is your AI interaction workspace.
+		During this operation, connect to Jira using the credentials already established. Let me know if you need help with the credentials.
+
+UI behavior should:
+	Display the structured XML output in the main panel (AI interaction workspace)
+	Render XML in a readable, formatted view
+	Allow expand/collapse of nodes
+	Highlight tags and values clearly
+	Support copy/export options
+	
+Live System Feedback (Chat Panel) - While processing:
+	Show real-time updates such as:
+		Connecting to Jira via MCP
+		Authenticating
+		Fetching issue details
+		Parsing response
+		Rendering XML
+
+After completion:
+	Provide a summary of retrieved data. With all the above information collected, summarize and generate the intent and the claim details from the CSR
+	Confirm successful fetch and transformation
+
+
+Step 2: Review & Approval Workflow
+Ensure that the retrieved and structured requirements (from Jira) are validated by the user before proceeding, maintaining enterprise-grade accuracy and control.
+User Review Stage
+	After displaying the XML-formatted requirements in the main panel:
+		Pause further system execution
+		Prompt the user to review the extracted details carefully
+Provide clear action options:
+	✅ Approve → Confirms the requirements are correct
+	✏️ Request Changes → Allows user to refine or correct specific sections
+
+
+completed and tested until this ..
+
+------------------------------------------------------------------------------------------------------------------------------
+
+Step 3:
+Chat-Based Interaction (IBM BOB Style) - Use the chat panel to guide the user:
+	Use OpenAI credentials and provide a summary of retrieved data. Summarize and generate the intent and the claim details from the CSR
+	Confirm successful fetch and transformation "Please review the retrieved requirements. Confirm if everything is accurate or suggest changes.”
+	If the user provides feedback:
+		Capture the input
+		Update the structured data accordingly
+		Re-render the updated XML in real-time
+
+Editable & Interactive XML. Allow:
+	Inline edits (optional advanced feature)
+	Section-level refinement (e.g., Summary, Acceptance Criteria)
+	Maintain versioning of updates (for traceability)
+
+System Behavior. Do not proceed to task/workflow generation until:
+	Explicit user approval is received
+	Once approved:
+		Log approval event
+		Lock the finalized requirement state
+	Trigger the next phase (task generation / workflow engine)
+
+UI/UX Expectations. Display approval controls prominently near the XML panel
+Show status indicators:
+	🟡 Pending Review
+	🟢 Approved
+	🔵 Updated
+Provide visual confirmation after approval:
+	“Requirements approved. Proceeding to workflow generation…”
+
+⛔ Controlled Scope Instruction (IMPORTANT)
+
+At this stage, stop the implementation after completing Step 2.
+Ensure:
+	Jira integration via MCP is working
+	XML rendering is accurate
+	Review and approval workflow is fully functional
+	UI interactions are tested end-to-end
+
+Do not proceed to task generation, workflow automation, or further processing yet
+Once all of the above is successfully implemented and tested, I will provide the next set of steps and enhancements to continue building the system.
+
+
+Ensure that the retrieved and structured requirements (from Jira) are validated by the user before proceeding, maintaining enterprise-grade accuracy and control.
+## Once approved by SME, using the template JCL, plug the identified Claim details into the Unit test JCL
+## Show the final unit test jcl on screen for the SME to check and edit if needed
+## Wait for the SME to review and approve before submitting this JCL in the next step
+## Once approved, run JCL scan to ensure there are no errors 
+## Once JCL is validated for no JCL Errors, submit the JCL
+## Show the Job run status with a progress Bar
+## Show the Job log details on the screen
+## Wait for the SME sign-off/approval to proceed further
+## Using the template Unit test JCL, create the pending claim delete transaction file
+## show the JCL on screen with edit more for the SME to review
+## Once SME approved, submit the JCL
+## Show the Job run status with a progress Bar
+## Show the Job log details on the screen
+## Open the Delete transaction on screen for the SME to check
+## Once reviewed/signed-off, using the template JCL, build the JCL to unit test the pending del transactions
+## show the JCL on screen with edit more for the SME to review
+## Once SME approved, submit the JCL
+## Show the Job run status with a progress Bar
+## Show the Job log details on the screen
+## Open the HRHRORPT report file for review.
+## Once reviewed and signed-off, using the template one-timer JCL, create the One-timer JCL to laod the del txns to the region
+## show the JCL on screen with edit more for the SME to review
+## Once SME approved, connect to NShare and create the one-timer request form
+## Share the Nshare one-timer link for SME review and sign-off.
+## Update Jira comments with the one-timer details and Nshare req#
+## On the following day, rerun the unit test jcl created in the past to pull the claims from the given region
+## Let SME review and sign-off
+## Generate an email to the Plan customer that the given claim(s) are deleted from the region
+
+We transformed a manual, multi-day mainframe process into an agentic, approval-driven workflow using IBM BOB, reducing execution time and human effort significantly
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,228 @@
+// Prisma Schema for OneTimer Bob Application
+// Database: PostgreSQL 15+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - Stores TSO user information
+model User {
+  id                String         @id @default(uuid())
+  tsoId             String         @unique @db.VarChar(10)
+  encryptedPassword String         @db.Text // AES-256 encrypted TSO password
+  displayName       String?        @db.VarChar(100)
+  email             String?        @db.VarChar(255)
+  isActive          Boolean        @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Relations
+  sessions          Session[]
+  workflows         Workflow[]
+  conversations     Conversation[]
+  auditLogs         AuditLog[]
+
+  @@index([tsoId])
+  @@index([isActive])
+  @@map("users")
+}
+
+// Session model - JWT session management
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique @db.Text
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?  @db.Text
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// Workflow model - Represents a complete workflow execution
+model Workflow {
+  id            String   @id @default(uuid())
+  userId        String
+  csrId         String   @db.VarChar(50) // Jira CSR/Issue ID
+  title         String   @db.VarChar(255)
+  description   String?  @db.Text
+  status        String   @db.VarChar(50) // pending, in_progress, completed, failed, cancelled
+  jiraData      Json? // Structured Jira issue data
+  approvalState String   @db.VarChar(50) // pending_review, approved, rejected, updated
+  metadata      Json? // Additional workflow metadata
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  conversations Conversation[]
+  approvals     Approval[]
+
+  @@index([userId])
+  @@index([csrId])
+  @@index([status])
+  @@index([approvalState])
+  @@map("workflows")
+}
+
+// Task model - Individual tasks within a workflow
+model Task {
+  id          String    @id @default(uuid())
+  workflowId  String
+  sequence    Int // Order of execution
+  title       String    @db.VarChar(255)
+  description String?   @db.Text
+  status      String    @db.VarChar(50) // pending, in_progress, completed, failed, skipped
+  type        String    @db.VarChar(50) // jira_fetch, jcl_generation, jcl_submission, approval, etc.
+  metadata    Json? // Task-specific data (JCL content, job IDs, etc.)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([type])
+  @@index([sequence])
+  @@map("tasks")
+}
+
+// Conversation model - Chat messages for multi-turn interaction
+model Conversation {
+  id         String   @id @default(uuid())
+  workflowId String
+  userId     String
+  role       String   @db.VarChar(20) // user, system, assistant
+  message    String   @db.Text
+  metadata   Json? // Additional message metadata
+  createdAt  DateTime @default(now())
+
+  // Relations
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([userId])
+  @@index([role])
+  @@index([createdAt])
+  @@map("conversations")
+}
+
+// Approval model - Tracks approval events
+model Approval {
+  id         String   @id @default(uuid())
+  workflowId String
+  taskId     String?
+  approver   String   @db.VarChar(10) // TSO ID of approver
+  action     String   @db.VarChar(20) // approved, rejected, requested_changes
+  comments   String?  @db.Text
+  metadata   Json? // Additional approval data
+  createdAt  DateTime @default(now())
+
+  // Relations
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([approver])
+  @@index([action])
+  @@map("approvals")
+}
+
+// JCLTemplate model - Stores reusable JCL templates
+model JCLTemplate {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  category    String   @db.VarChar(50) // unit_test, delete_transaction, one_timer, etc.
+  template    String   @db.Text // JCL template content with placeholders
+  variables   Json // Template variable definitions
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+  @@map("jcl_templates")
+}
+
+// MainframeJob model - Tracks mainframe job submissions
+model MainframeJob {
+  id          String    @id @default(uuid())
+  workflowId  String?
+  jobName     String    @db.VarChar(8) // Mainframe job name (8 chars max)
+  jobId       String    @db.VarChar(8) // Mainframe job ID
+  jclContent  String    @db.Text
+  status      String    @db.VarChar(50) // submitted, running, completed, failed, abended
+  returnCode  String?   @db.VarChar(10)
+  output      String?   @db.Text // Job output/logs
+  submittedBy String    @db.VarChar(10) // TSO ID
+  submittedAt DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workflowId])
+  @@index([jobName])
+  @@index([jobId])
+  @@index([status])
+  @@index([submittedBy])
+  @@map("mainframe_jobs")
+}
+
+// AuditLog model - Comprehensive audit trail
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String   @db.VarChar(100) // login, logout, workflow_created, jcl_submitted, etc.
+  resource   String?  @db.VarChar(100) // Resource affected (workflow ID, job ID, etc.)
+  details    Json? // Additional audit details
+  ipAddress  String?  @db.VarChar(45)
+  userAgent  String?  @db.Text
+  success    Boolean  @default(true)
+  errorMsg   String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// Configuration model - System configuration settings
+model Configuration {
+  id        String   @id @default(uuid())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.Text
+  category  String   @db.VarChar(50) // mainframe, jira, system, etc.
+  isSecret  Boolean  @default(false) // If true, value is encrypted
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([category])
+  @@map("configurations")
+}

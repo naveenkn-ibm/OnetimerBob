@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: onetimer-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+      - REACT_APP_WS_URL=ws://localhost:5000
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - onetimer-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: onetimer-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - DATABASE_URL=postgresql://onetimer:onetimer123@postgres:5432/onetimer_db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your-encryption-key-32-chars-min}
+      - ZOSMF_HOST=204.90.115.200
+      - ZOSMF_PORT=10443
+      - ZOSMF_ACCOUNT=FB3
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - JIRA_URL=${JIRA_URL}
+      - JIRA_USERNAME=${JIRA_USERNAME}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - onetimer-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: onetimer-postgres
+    environment:
+      - POSTGRES_USER=onetimer
+      - POSTGRES_PASSWORD=onetimer123
+      - POSTGRES_DB=onetimer_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - onetimer-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onetimer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: onetimer-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - onetimer-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  onetimer-network:
+    driver: bridge
+
+# Made with Bob
