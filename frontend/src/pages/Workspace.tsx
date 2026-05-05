@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import {
-  AlertCircle,
-  ArrowUpDown,
-  Bot,
-  Calendar,
+  LogOut,
+  Search,
+  FileText,
   CheckCircle,
   Clipboard,
   ClipboardCheck,
@@ -17,14 +16,6 @@ import {
   FileText,
   LogOut,
   MessageSquare,
-  Play,
-  RefreshCw,
-  Search,
-  Settings,
-  ShieldCheck,
-  Trash2,
-  User,
-  XCircle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -96,18 +87,6 @@ interface ChatMessage {
   spoolFiles?: Array<{ ddname: string; id: string; lines?: string[] }>;
 }
 
-const WORKFLOW_STEP_NAMES = [
-  'Pull Claims JCL',
-  'Validate Report',
-  'Create Del Transactions',
-  'Validate',
-  'NShare Req',
-  'One-timer',
-] as const;
-
-const getDefaultWorkflow = (): WorkflowStep[] =>
-  WORKFLOW_STEP_NAMES.map((name) => ({ name, status: 'pending' }));
-
 const Workspace: React.FC = () => {
   const { user, logout } = useAuth();
 
@@ -115,6 +94,12 @@ const Workspace: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jiraData, setJiraData] = useState<JiraData | null>(null);
+  const [xmlData, setXmlData] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['summary']));
+  const [progress, setProgress] = useState<ProgressStep | null>(null);
+  
+  // Step 4: AI Analysis State
   const [aiAnalysis, setAiAnalysis] = useState<IntentAnalysisResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -150,36 +135,9 @@ const Workspace: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [consoleFilter, setConsoleFilter] = useState<string>('all');
   const [consoleSearch, setConsoleSearch] = useState('');
-
-  const [btpIssues, setBtpIssues] = useState<BTPIssue[]>([]);
-  const [isBtpLoading, setIsBtpLoading] = useState(false);
-
-  const [workflowStarted, setWorkflowStarted] = useState(false);
-  const [consoleNewest, setConsoleNewest] = useState(true);
-  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
-  const [claimsCopied, setClaimsCopied] = useState(false);
-
-  // JCL editor state
-  const [jclContent, setJclContent] = useState<string>('');
-  const [isJclEditing, setIsJclEditing] = useState(false);
-  const jclBeforeEditRef = useRef<string>('');
-
-  // Spool viewer state
-  const [spoolViewerOpen, setSpoolViewerOpen] = useState(false);
-  const [spoolFiles, setSpoolFiles] = useState<Array<{ id: string; ddname?: string; linesCount: number }>>([]);
-  const [spoolFileContents, setSpoolFileContents] = useState<Record<string, string[]>>({});
-  const [selectedSpoolDd, setSelectedSpoolDd] = useState<string>('');
-  const [isLoadingSpool, setIsLoadingSpool] = useState(false);
-
-  // Job lifecycle badge: idle | submitted | running | completed | failed
-  const [jobLifecycle, setJobLifecycle] = useState<'idle' | 'submitted' | 'running' | 'completed' | 'failed'>('idle');
-
-  // Per-step approval gate
-  const [stepAwaitingApproval, setStepAwaitingApproval] = useState<{
-    step: string;
-    stepIndex: number;
-    nextStep?: string;
-  } | null>(null);
+  const [showConsoleDetails, setShowConsoleDetails] = useState<string | null>(null);
+  const [consoleOrder, setConsoleOrder] = useState<'newest-first' | 'oldest-first'>('oldest-first');
+  const consoleRef = React.useRef<HTMLDivElement>(null);
 
   // AI error analysis for failed steps
   const [stepErrorAnalysis, setStepErrorAnalysis] = useState<{
@@ -397,6 +355,10 @@ const Workspace: React.FC = () => {
 
     setIsLoading(true);
     setError(null);
+    setJiraData(null);
+    setXmlData(null);
+    setIsApproved(false);
+    setAiAnalysis(null);
     setAiError(null);
     setChatMessages([]);
     setJiraData(null);
@@ -405,43 +367,106 @@ const Workspace: React.FC = () => {
     setWorkflowStepStatus('Pull Claims JCL', 'in-progress');
 
     addChatMessage('security', `User ${user?.tsoId} initiated issue fetch`, 'info');
-    addChatMessage('jira', `Fetching issue ${issueKey.trim()} from JIRA`, 'info');
+    addChatMessage('jira', `Connecting to Jira MCP server for issue: ${csrId.trim()}`, 'info');
 
-    if (issueKeyOverride) {
-      setCsrId(issueKeyOverride);
-    }
+    // Simulate progress steps
+    const steps = [
+      'Connecting to Jira via MCP...',
+      'Authenticating...',
+      'Fetching issue details...',
+      'Parsing response...',
+      'Rendering XML...',
+    ];
 
     try {
-      const issueResponse = await api.getJiraIssue(issueKey.trim());
-      setJiraData(issueResponse.data);
-      addChatMessage('jira', `Issue ${issueKey.trim()} loaded`, 'success');
+      for (let i = 0; i < steps.length; i++) {
+        setProgress({
+          step: i + 1,
+          totalSteps: steps.length,
+          message: steps[i],
+          status: 'in-progress',
+        });
+        addChatMessage('workflow', steps[i], 'info');
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
 
-      const issueDataForAI = {
-        ...issueResponse.data,
-        fields: {
-          ...issueResponse.data.fields,
-          attachment: issueResponse.data.fields.attachment?.map((att: any) => ({
-            id: att.id,
-            filename: att.filename,
-            size: att.size,
-            mimeType: att.mimeType,
-            created: att.created,
-            author: att.author,
-          })),
-        },
-      };
+      const fetchStart = Date.now();
+      const response = await api.getJiraIssue(csrId.trim());
+      const fetchDuration = Date.now() - fetchStart;
 
-      setIsAnalyzing(true);
-      addChatMessage('ai', 'Analyzing intent and entities', 'info');
-      const aiResponse = await api.analyzeCSR(issueDataForAI, socket?.id);
-      setAiAnalysis(aiResponse.data);
-      setEditedIntent(aiResponse.data.intent);
-      setEditedRegion(aiResponse.data.region || '');
-      setEditedClaims((aiResponse.data.claims || []).join(', '));
+      if (response.success) {
+        console.log('🔍 Raw API Response:', response);
+        setJiraData(response.data);
+        setXmlData(response.xml || null);
+        
+        addChatMessage('performance', `API response received`, 'success', `Response time: ${fetchDuration}ms`, fetchDuration);
+        addChatMessage('jira', `Issue ${csrId.trim()} fetched successfully`, 'success',
+          `Status: ${typeof response.data.fields.status === 'string' ? response.data.fields.status : response.data.fields.status?.name}`);
+        
+        setProgress({
+          step: steps.length,
+          totalSteps: steps.length,
+          message: 'Successfully retrieved issue details',
+          status: 'completed',
+        });
 
-      setWorkflowStepStatus('Pull Claims JCL', 'completed');
-      setWorkflowStepStatus('Validate Report', 'in-progress');
-      addChatMessage('workflow', 'Analysis ready for human decision', 'success');
+        // Step 4: Automatically trigger AI analysis
+        await handleAIAnalysis(response.data);
+      } else {
+        throw new Error(response.message || 'Failed to fetch issue');
+      }
+    } catch (err) {
+      const apiError = handleApiError(err);
+      setError(apiError.message);
+      addChatMessage('debug', 'Error details', 'error', apiError.message);
+      setProgress({
+        step: 0,
+        totalSteps: steps.length,
+        message: apiError.message,
+        status: 'error',
+      });
+    } finally {
+      const totalDuration = Date.now() - startTime;
+      addChatMessage('performance', `Total operation time: ${totalDuration}ms`, 'info', undefined, totalDuration);
+      setIsLoading(false);
+    }
+  };
+
+  // Step 4: AI Analysis Handler
+  const handleAIAnalysis = async (issueData: JiraData) => {
+    const startTime = Date.now();
+    setIsAnalyzing(true);
+    setAiError(null);
+    
+    addChatMessage('workflow', 'Initiating AI analysis workflow', 'info');
+    addChatMessage('ai', 'Sending CSR content to OpenAI GPT-4o-mini', 'info');
+    addChatMessage('security', 'Encrypting sensitive data before transmission', 'info');
+
+    try {
+      const response = await api.analyzeCSR(issueData, socket?.id);
+      const duration = Date.now() - startTime;
+
+      if (response.success) {
+        setAiAnalysis(response.data);
+        
+        addChatMessage('performance', `AI analysis completed`, 'success', `Processing time: ${duration}ms`, duration);
+        addChatMessage('ai', `Intent identified: "${response.data.intent}"`, 'success',
+          `Confidence: ${response.data.confidence}%`);
+        
+        if (response.data.claims && response.data.claims.length > 0) {
+          addChatMessage('ai', `Extracted ${response.data.claims.length} claim(s)`, 'success',
+            `Region: ${response.data.region || 'unspecified'}\nClaims: ${response.data.claims.join(', ')}`);
+        }
+
+        if (!response.validation.valid) {
+          addChatMessage('workflow', `Validation issues detected`, 'warning',
+            response.validation.issues.join('\n'));
+        } else {
+          addChatMessage('workflow', 'All validations passed', 'success');
+        }
+      } else {
+        throw new Error(response.message || 'AI analysis failed');
+      }
     } catch (err) {
       const apiError = handleApiError(err);
       setError(apiError.message);
@@ -474,29 +499,15 @@ const Workspace: React.FC = () => {
           : aiAnalysis.claims,
       };
 
-      const issueDataForAI = {
-        ...jiraData,
-        fields: {
-          ...jiraData.fields,
-          attachment: jiraData.fields.attachment?.map((att: any) => ({
-            id: att.id,
-            filename: att.filename,
-            size: att.size,
-            mimeType: att.mimeType,
-            created: att.created,
-            author: att.author,
-          })),
-        },
-      };
+      const response = await api.reanalyzeCSR(jiraData, corrections, socket?.id);
 
-      const response = await api.reanalyzeCSR(issueDataForAI, corrections, socket?.id);
-      setAiAnalysis(response.data);
-      setEditedIntent(response.data.intent);
-      setEditedRegion(response.data.region || '');
-      setEditedClaims((response.data.claims || []).join(', '));
-      setIsEditingAnalysis(false);
-      setHumanLoopStatus('pending');
-      addChatMessage('ai', 'Re-analysis complete. Ready for approval.', 'success');
+      if (response.success) {
+        setAiAnalysis(response.data);
+        setIsEditingAnalysis(false);
+        addChatMessage('ai', 'Re-analysis complete with your corrections.');
+      } else {
+        throw new Error(response.message || 'Re-analysis failed');
+      }
     } catch (err) {
       const apiError = handleApiError(err);
       setAiError(apiError.message);
@@ -634,54 +645,48 @@ const Workspace: React.FC = () => {
     addChatMessage('workflow', 'Workflow rejected by reviewer', 'error');
   };
 
-  const fetchBTPIssues = async () => {
-    setIsBtpLoading(true);
-    try {
-      const mockIssues: BTPIssue[] = [
-        {
-          key: 'BTP-5',
-          fields: {
-            summary: 'Restore Claims from Production',
-            status: { name: 'To Do' },
-            assignee: { displayName: 'Kiranmai Gurram' },
-            created: '2026-05-22T00:00:00.000Z',
-          },
-        },
-        {
-          key: 'BTP-4',
-          fields: {
-            summary: 'Delete Pending claims',
-            status: { name: 'To Do' },
-            assignee: { displayName: 'NAVEEN NARAYAN RAO' },
-            created: '2026-05-31T00:00:00.000Z',
-          },
-        },
-        {
-          key: 'BTP-3',
-          fields: {
-            summary: 'Delete pending claims from Production env',
-            status: { name: 'To Do' },
-            created: '2026-05-30T00:00:00.000Z',
-          },
-        },
-      ];
-
-      setBtpIssues(mockIssues);
-      addChatMessage('jira', `Loaded ${mockIssues.length} BTP issues`, 'success');
-    } catch {
-      addChatMessage('jira', 'Failed to load BTP issues', 'error');
-    } finally {
-      setIsBtpLoading(false);
+  const handleCopyXml = () => {
+    if (xmlData) {
+      navigator.clipboard.writeText(xmlData);
+      addChatMessage('system', 'XML copied to clipboard', 'success');
+      addChatMessage('security', 'Data copied to clipboard', 'info');
     }
   };
 
-  const handleDownloadAttachment = (attachment: JiraAttachment) => {
+  const handleDownloadXml = () => {
+    if (xmlData && jiraData) {
+      const blob = new Blob([xmlData], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${jiraData.key}_requirements.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addChatMessage('system', `XML file downloaded: ${jiraData.key}_requirements.xml`, 'success');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const handleDownloadAttachment = (attachment: any) => {
     try {
+      // Decode base64 content
       const binaryString = atob(attachment.content);
       const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i += 1) {
+      for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
+      
       const blob = new Blob([bytes], { type: attachment.mimeType || 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -691,318 +696,19 @@ const Workspace: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
-      addChatMessage('debug', 'Attachment download failed', 'error');
+      addChatMessage('system', `Attachment downloaded: ${attachment.filename}`, 'success');
+    } catch (error) {
+      addChatMessage('system', `Failed to download attachment: ${error}`, 'error');
     }
   };
 
-  const filteredMessages = useMemo(() => {
-    const filtered = chatMessages.filter((msg) => {
-      // Exclude workflow messages from System Console
-      if (msg.type === 'workflow') return false;
-      const matchesFilter = consoleFilter === 'all' || msg.type === consoleFilter;
-      const matchesSearch =
-        !consoleSearch ||
-        msg.message.toLowerCase().includes(consoleSearch.toLowerCase()) ||
-        (msg.details && msg.details.toLowerCase().includes(consoleSearch.toLowerCase()));
-      return matchesFilter && matchesSearch;
-    });
-    return consoleNewest ? [...filtered].reverse() : filtered;
-  }, [chatMessages, consoleFilter, consoleSearch, consoleNewest]);
-
-  const handleExportLogs = () => {
-    const text = chatMessages
-      .map((m) => `[${m.timestamp.toISOString()}] [${m.type}] ${m.message}${m.details ? '\n  ' + m.details : ''}`)
-      .join('\n');
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `onetimerBob-console-${Date.now()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
-
-  // ── JCL syntax highlighting ───────────────────────────────────────────────────
-  const highlightJclLine = (line: string): React.ReactNode => {
-    if (line.startsWith('//*')) return <span className="text-slate-500">{line}</span>;
-    if (line === '/*' || line.startsWith('/* ')) return <span className="text-yellow-300">{line}</span>;
-    if (line.startsWith('//')) {
-      const match = line.match(/^(\/\/\S*)\s+(\S+)(.*)$/);
-      if (match) {
-        return (
-          <>
-            <span className="text-cyan-300">{match[1]}</span>
-            <span className="text-yellow-200"> {match[2]}</span>
-            <span className="text-slate-300">{match[3]}</span>
-          </>
-        );
-      }
-      return <span className="text-cyan-300">{line}</span>;
-    }
-    return <span className="text-green-200">{line}</span>;
-  };
-
-  // ── Open spool viewer ─────────────────────────────────────────────────────────
-  const handleOpenSpoolViewer = async () => {
-    if (!jobState.jobId) return;
-    setSpoolViewerOpen(true);
-    setIsLoadingSpool(true);
-    setSpoolFileContents({});
-    setSelectedSpoolDd('');
-    try {
-      const statusResp = await api.getTSOStatus(jobState.jobId);
-      const files = statusResp.data.spoolFiles;
-      setSpoolFiles(files);
-      const firstKey = files[0]?.ddname || files[0]?.id || '';
-      if (firstKey) setSelectedSpoolDd(firstKey);
-      for (const file of files) {
-        const key = file.ddname || file.id;
-        try {
-          const spoolResp = await api.getTSOSpool(jobState.jobId, file.id);
-          setSpoolFileContents((prev) => ({ ...prev, [key]: spoolResp.data.lines }));
-        } catch {
-          setSpoolFileContents((prev) => ({ ...prev, [key]: ['[Error loading spool file]'] }));
-        }
-      }
-    } catch {
-      addChatMessage('debug', 'Failed to load spool files', 'error');
-    } finally {
-      setIsLoadingSpool(false);
-    }
-  };
-
-  // ── Fetch spool files for a specific job and attach to message ────────────────
-  const handleJobLinkClick = async (messageId: string, jobId: string) => {
-    // Check if already expanded with spool files
-    const msg = chatMessages.find(m => m.id === messageId);
-    
-    if (msg?.spoolFiles && msg.spoolFiles.length > 0) {
-      // Toggle collapse
-      setExpandedMessageId(expandedMessageId === messageId ? null : messageId);
-      return;
-    }
-
-    // Show loading indicator
-    setChatMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, details: 'Loading spool files...' }
-          : m
-      )
-    );
-    setExpandedMessageId(messageId);
-
-    // Fetch spool files
-    try {
-      const statusResp = await api.getTSOStatus(jobId);
-      const files = statusResp.data.spoolFiles;
-      
-      if (!files || files.length === 0) {
-        // Update message with helpful info
-        setChatMessages((prev) =>
-          prev.map((m) =>
-            m.id === messageId
-              ? {
-                  ...m,
-                  details: `No spool files available yet for job ${jobId}.\n\nPossible reasons:\n• Job is still running\n• Job hasn't generated output yet\n• Job completed but spool files were purged\n\nTry clicking again in a few moments if the job is still running.`,
-                  spoolFiles: []
-                }
-              : m
-          )
-        );
-        return;
-      }
-      
-      // Fetch content for each spool file
-      const spoolData: Array<{ ddname: string; id: string; lines?: string[] }> = [];
-      for (const file of files) {
-        try {
-          const spoolResp = await api.getTSOSpool(jobId, file.id);
-          spoolData.push({
-            ddname: file.ddname || file.id,
-            id: file.id,
-            lines: spoolResp.data.lines,
-          });
-        } catch (err) {
-          spoolData.push({
-            ddname: file.ddname || file.id,
-            id: file.id,
-            lines: ['[Error loading spool file]'],
-          });
-        }
-      }
-      
-      // Update the message with spool files
-      setChatMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, spoolFiles: spoolData, details: undefined }
-            : m
-        )
-      );
-    } catch (err) {
-      // Update message with error details
-      setChatMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? {
-                ...m,
-                details: `Failed to load spool files for job ${jobId}.\n\nError: ${err}\n\nPlease check:\n• Job ID is correct\n• Backend server is running\n• z/OSMF connection is active`,
-                spoolFiles: []
-              }
-            : m
-        )
-      );
-    }
-  };
-
-  // â”€â”€ Reusable System Console panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const systemConsolePanel = (
-    <div className="glass rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-blue-400" />
-          <h3 className="text-base font-semibold text-white">System Console</h3>
-          {chatMessages.length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-blue-500/30 text-blue-300 rounded-full">
-              {chatMessages.length}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setConsoleNewest((v) => !v)}
-            title={consoleNewest ? 'Showing newest first' : 'Showing oldest first'}
-            className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded"
-          >
-            <ArrowUpDown className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={handleExportLogs} title="Export logs" className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded">
-            <Download className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => setChatMessages([])} title="Clear console" className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1 mb-2">
-        {['all', 'system', 'ai', 'mainframe', 'jira', 'security', 'debug'].map((filter) => (
-          <button
-            key={filter}
-            onClick={() => setConsoleFilter(filter)}
-            className={`px-2 py-0.5 text-[10px] rounded ${
-              consoleFilter === filter ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            {filter}
-          </button>
-        ))}
-      </div>
-
-      <input
-        type="text"
-        value={consoleSearch}
-        onChange={(e) => setConsoleSearch(e.target.value)}
-        placeholder="Search logs..."
-        className="w-full mb-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-      />
-
-      <div ref={consoleRef} className="h-64 overflow-y-auto bg-slate-950 border border-slate-700 rounded p-2 font-mono text-xs">
-        {filteredMessages.length === 0 ? (
-          <p className="text-slate-500 italic">No matching logs</p>
-        ) : (
-          filteredMessages.map((msg) => {
-            const isExpanded = expandedMessageId === msg.id;
-            const hasJobInfo = msg.jobId && msg.jobName;
-            const hasSpoolFiles = msg.spoolFiles && msg.spoolFiles.length > 0;
-            const showExpandIcon = msg.details || hasJobInfo;
-            
-            return (
-              <div
-                key={msg.id}
-                className="py-1 border-b border-slate-800 last:border-0 px-1 rounded"
-              >
-                <div
-                  className="flex items-center gap-1 text-slate-500 cursor-pointer hover:bg-slate-900/50"
-                  onClick={() => {
-                    if (msg.details) {
-                      setExpandedMessageId(isExpanded ? null : msg.id);
-                    }
-                  }}
-                >
-                  {showExpandIcon ? (
-                    isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />
-                  ) : (
-                    <span className="w-3" />
-                  )}
-                  <span>[{msg.timestamp.toLocaleTimeString()}]</span>
-                  <span className="uppercase text-[9px]">{msg.type}</span>
-                </div>
-                <div
-                  className={`pl-4 ${
-                    msg.category === 'error'
-                      ? 'text-red-300'
-                      : msg.category === 'warning'
-                      ? 'text-yellow-300'
-                      : msg.category === 'success'
-                      ? 'text-green-300'
-                      : 'text-slate-200'
-                  }`}
-                >
-                  {hasJobInfo ? (
-                    <span>
-                      Job submitted:{' '}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleJobLinkClick(msg.id, msg.jobId!);
-                        }}
-                        className="text-cyan-400 hover:text-cyan-300 underline decoration-dotted hover:decoration-solid transition-colors"
-                      >
-                        {msg.jobName}/{msg.jobId}
-                      </button>
-                      {hasSpoolFiles && (
-                        <span className="ml-2 text-[10px] text-slate-400">
-                          ({msg.spoolFiles!.length} spool files)
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    msg.message
-                  )}
-                </div>
-                {isExpanded && msg.details && (
-                  <div className="pl-4 mt-1 text-slate-400 whitespace-pre-wrap">{msg.details}</div>
-                )}
-                {isExpanded && hasSpoolFiles && (
-                  <div className="pl-4 mt-2 space-y-2">
-                    {msg.spoolFiles!.map((spool, idx) => (
-                      <details key={idx} className="bg-slate-900/50 rounded border border-slate-700">
-                        <summary className="px-2 py-1 cursor-pointer hover:bg-slate-800/50 text-cyan-300 text-[11px] font-semibold">
-                          {spool.ddname} ({spool.lines?.length || 0} lines)
-                        </summary>
-                        <div className="px-2 py-1 max-h-40 overflow-y-auto bg-slate-950 text-[10px] text-slate-300">
-                          {spool.lines?.map((line, lineIdx) => (
-                            <div key={lineIdx} className="whitespace-pre font-mono">
-                              {line}
-                            </div>
-                          )) || <div className="text-slate-500 italic">No content</div>}
-                        </div>
-                      </details>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -1010,8 +716,8 @@ const Workspace: React.FC = () => {
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
-                <Bot className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <FileText className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">OneTimer Bob</h1>
@@ -1037,44 +743,54 @@ const Workspace: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!workflowStarted ? (
-          /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-             PRE-WORKFLOW LAYOUT  (old 4-column layout)
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-            {/* â”€â”€ Left 2 cols: CSR input + JIRA data + AI Analysis â”€â”€ */}
-            <section className="lg:col-span-2 space-y-6">
-
-              {/* CSR Input */}
-              <div className="glass rounded-xl p-4">
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium text-white whitespace-nowrap">Enter CSR / Issue ID</label>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* CSR Input Section */}
+            <div className="glass rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Enter CSR / Issue ID</h2>
+              <div className="flex gap-3">
+                <div className="flex-1">
                   <input
                     type="text"
                     value={csrId}
                     onChange={(e) => setCsrId(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleFetchJiraIssue(); }}
-                    placeholder="BTP-5"
+                    onKeyPress={(e) => e.key === 'Enter' && handleFetchJiraIssue()}
+                    placeholder="e.g., PROJ-123, BTP-2"
                     disabled={isLoading}
-                    className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <button
-                    onClick={() => handleFetchJiraIssue()}
-                    disabled={isLoading || !csrId.trim()}
-                    className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                  >
-                    <Search className="w-4 h-4" />
-                    {isLoading ? 'Loading...' : 'Fetch & Analyze'}
-                  </button>
                 </div>
-                {error && (
-                  <div className="mt-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-300 text-sm flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" /> {error}
-                  </div>
-                )}
+                <button
+                  onClick={handleFetchJiraIssue}
+                  disabled={isLoading || !csrId.trim()}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                >
+                  <Search className="w-5 h-5" />
+                  Fetch & Analyze
+                </button>
               </div>
+
+              {/* Progress Bar */}
+              {isLoading && progress && (
+                <div className="mt-6">
+                  <ProgressBar progress={progress} />
+                </div>
+              )}
+
+              {/* Error Message */}
+              {error && (
+                <div className="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-400">Error</p>
+                    <p className="text-sm text-red-300 mt-1">{error}</p>
+                  </div>
+                </div>
+              )}
+            </div>
 
               {/* JIRA Data */}
               {jiraData && (
@@ -1097,7 +813,9 @@ const Workspace: React.FC = () => {
                       Open in Jira <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+
+                  {/* Metadata */}
+                  <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-700">
                     <div>
                       <p className="text-slate-400">Reporter</p>
                       <p className="text-white">
@@ -1111,505 +829,348 @@ const Workspace: React.FC = () => {
                       </p>
                     </div>
                     <div>
+                      <p className="text-xs text-slate-400 mb-1">Jira Link</p>
+                      <a
+                        href={`https://jsw.ibm.com/browse/${jiraData.key}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-400 hover:text-blue-300 underline"
+                      >
+                        {jiraData.key}
+                      </a>
+                    </div>
+                    <div>
                       <p className="text-slate-400">Updated</p>
                       <p className="text-white">{new Date(jiraData.fields.updated).toLocaleString()}</p>
                     </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Updated</p>
+                      <p className="text-sm text-white">{formatDate(jiraData.fields.updated)}</p>
+                    </div>
                   </div>
+
+                  {/* Labels */}
+                  {jiraData.fields.labels && jiraData.fields.labels.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-slate-700">
+                      <p className="text-xs text-slate-400 mb-2">Labels</p>
+                      <div className="flex flex-wrap gap-2">
+                        {jiraData.fields.labels.map((label, index) => (
+                          <span
+                            key={typeof label === 'string' ? label : `label-${index}`}
+                            className="px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded"
+                          >
+                            {typeof label === 'string' ? label : (label as any)?.name || String(label)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Attachments */}
                   {jiraData.fields.attachment && jiraData.fields.attachment.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-slate-700">
                       <p className="text-xs text-slate-400 mb-2">Attachments ({jiraData.fields.attachment.length})</p>
-                      <div className="flex flex-wrap gap-2">
-                        {jiraData.fields.attachment.map((att) => (
-                          <button key={att.id} onClick={() => handleDownloadAttachment(att)}
-                            className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs rounded">
-                            {att.filename}
-                          </button>
+                      <div className="space-y-2">
+                        {jiraData.fields.attachment.map((attachment, index) => (
+                          <div
+                            key={attachment.id || `attachment-${index}`}
+                            className="flex items-center justify-between p-3 bg-slate-800 rounded-lg hover:bg-slate-750 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-white font-medium truncate">
+                                  {attachment.filename}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                                  <span>{formatFileSize(attachment.size)}</span>
+                                  {attachment.author && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{attachment.author.displayName}</span>
+                                    </>
+                                  )}
+                                  {attachment.created && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{formatDate(attachment.created)}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDownloadAttachment(attachment)}
+                              className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex-shrink-0"
+                              title={`Download ${attachment.filename}`}
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* AI Analysis Results */}
-              {(isAnalyzing || aiAnalysis) && (
-                <div className="glass rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-white">AI Analysis Results</h3>
-                    {aiAnalysis && (
-                      <span className={`px-3 py-1 text-xs rounded-full font-medium ${
-                        aiAnalysis.confidence >= 80 ? 'bg-green-500/20 text-green-300' :
-                        aiAnalysis.confidence >= 60 ? 'bg-yellow-500/20 text-yellow-300' :
-                        'bg-red-500/20 text-red-300'
-                      }`}>
-                        {aiAnalysis.confidence}% confidence
-                      </span>
-                    )}
-                  </div>
-
-                  {isAnalyzing && !aiAnalysis && (
-                    <div className="flex items-center gap-3 text-slate-300">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Analyzing issue with AI...
-                    </div>
-                  )}
-
-                  {aiAnalysis && (
-                    <div className="space-y-4">
-                      {aiAnalysis.summary && (
-                        <p className="text-sm text-slate-300 italic border-l-2 border-blue-500/50 pl-3">{aiAnalysis.summary}</p>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded">
-                          <p className="text-[11px] text-blue-300 mb-1">INTENT</p>
-                          {isEditingAnalysis ? (
-                            <input value={editedIntent} onChange={(e) => setEditedIntent(e.target.value)}
-                              className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm text-white" />
-                          ) : (
-                            <p className="text-sm text-white">{aiAnalysis.intent}</p>
-                          )}
-                        </div>
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded">
-                          <p className="text-[11px] text-emerald-300 mb-1">REGION</p>
-                          {isEditingAnalysis ? (
-                            <input value={editedRegion} onChange={(e) => setEditedRegion(e.target.value)}
-                              className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm text-white" />
-                          ) : (
-                            <p className="text-sm text-white">{aiAnalysis.region || 'Not specified'}</p>
-                          )}
-                        </div>
-                        <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
-                          <p className="text-[11px] text-purple-300 mb-1">CLAIMS</p>
-                          {isEditingAnalysis ? (
-                            <input value={editedClaims} onChange={(e) => setEditedClaims(e.target.value)}
-                              placeholder="comma separated"
-                              className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm text-white" />
-                          ) : (
-                            <p className="text-sm text-white font-mono">{(aiAnalysis.claims || []).join(', ') || 'â€”'}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {isEditingAnalysis && (
-                        <div className="flex gap-2">
-                          <button onClick={handleReanalyze} disabled={isAnalyzing}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm disabled:opacity-60 flex items-center gap-2">
-                            <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                            {isAnalyzing ? 'Re-analyzing...' : 'Re-analyze'}
-                          </button>
-                          <button onClick={() => { setIsEditingAnalysis(false); setHumanLoopStatus('pending'); }}
-                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm">
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-
-                      {aiError && (
-                        <div className="p-3 bg-orange-500/10 border border-orange-500/40 rounded text-orange-300 text-sm">
-                          {aiError}
-                        </div>
-                      )}
-
-                      {/* â”€â”€ Human-in-the-Loop controls â”€â”€ */}
-                      <div className="border-t border-slate-700 pt-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-xs text-slate-400 flex items-center gap-1">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Human in the Loop
-                          </p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            humanLoopStatus === 'approved' ? 'bg-green-500/20 text-green-300' :
-                            humanLoopStatus === 'rejected' ? 'bg-red-500/20 text-red-300' :
-                            humanLoopStatus === 'editing' ? 'bg-yellow-500/20 text-yellow-300' :
-                            'bg-slate-700 text-slate-300'
-                          }`}>
-                            {humanLoopStatus}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={handleApprove}
-                            disabled={humanLoopStatus === 'approved' || isEditingAnalysis}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm disabled:opacity-50">
-                            <CheckCircle className="w-4 h-4" /> Approve
-                          </button>
-                          <button onClick={handleEdit} disabled={isEditingAnalysis}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm disabled:opacity-50">
-                            <Edit3 className="w-4 h-4" /> Edit
-                          </button>
-                          <button onClick={handleReject} disabled={humanLoopStatus === 'rejected'}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm disabled:opacity-50">
-                            <XCircle className="w-4 h-4" /> Reject
-                          </button>
-                          <button onClick={handleStartWorkflow}
-                            disabled={humanLoopStatus !== 'approved' || isEditingAnalysis}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-500 to-cyan-600 hover:from-indigo-600 hover:to-cyan-700 text-white rounded text-sm font-semibold disabled:opacity-50 transition-all">
-                            <Play className="w-4 h-4" /> Start Workflow
-                          </button>
-                        </div>
-                        {humanLoopStatus === 'approved' && (
-                          <p className="text-xs text-green-400 mt-2">âœ“ Approved â€” click Start Workflow to begin execution</p>
-                        )}
+                {/* XML Display */}
+                {xmlData && (
+                  <div className="glass rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white">Structured Requirements (XML)</h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCopyXml}
+                          className="p-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                          title="Copy XML"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={handleDownloadXml}
+                          className="p-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                          title="Download XML"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </section>
 
-            {/* â”€â”€ JIRA Integration col â”€â”€ */}
-            <aside className="lg:col-span-1 space-y-6">
-              <div className="glass rounded-xl p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-blue-400" />
-                    <h3 className="text-base font-semibold text-white">JIRA Integration</h3>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={fetchBTPIssues} className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded">
-                      <RefreshCw className={`w-4 h-4 ${isBtpLoading ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button className="p-1.5 bg-slate-700 text-slate-300 rounded">
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {btpIssues.map((issue) => (
-                    <button key={issue.key} onClick={() => handleFetchJiraIssue(issue.key)}
-                      className="w-full text-left bg-slate-800/50 border border-slate-700 rounded-lg p-3 hover:border-blue-500/50 transition-colors">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-blue-300 font-semibold">{issue.key}</span>
-                        <span className="text-xs text-slate-300">{issue.fields.status.name}</span>
-                      </div>
-                      <p className="text-sm text-white line-clamp-2">{issue.fields.summary}</p>
-                      <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                        <span className="flex items-center gap-1"><User className="w-3 h-3" />{issue.fields.assignee?.displayName || 'Unassigned'}</span>
-                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(issue.fields.created).toLocaleDateString()}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </aside>
-
-            {/* â”€â”€ System Console col â”€â”€ */}
-            <aside className="lg:col-span-1">
-              {systemConsolePanel}
-            </aside>
-          </div>
-        ) : (
-          /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-             POST-WORKFLOW LAYOUT  (workflow orchestration + TSO window)
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-            {/* -- Workflow Approval Control Panel (3 cols) -- */}
-            <section className="lg:col-span-3 glass rounded-xl p-5 mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <ShieldCheck className="w-5 h-5 text-yellow-400" />
-                <h3 className="text-base font-semibold text-white">Workflow Approval Control</h3>
-              </div>
-              <p className="text-xs text-slate-400 mb-4">Review and approve each workflow step before execution</p>
-
-              {/* Approval steps list */}
-              <div className="space-y-3">
-                {workflowSteps.map((step, index) => {
-                  const isAwaitingApproval = stepAwaitingApproval?.step === step.name;
-                  const canApprove = step.status === 'in-progress' || isAwaitingApproval;
-                  const isCompleted = step.status === 'completed';
-                  const isFailed = step.status === 'error';
-                  
-                  return (
-                    <div
-                      key={step.name}
-                      className={`p-4 rounded-lg border transition-all ${
-                        isAwaitingApproval
-                          ? 'bg-yellow-500/10 border-yellow-500/40 shadow-lg'
-                          : isCompleted
-                          ? 'bg-green-500/10 border-green-500/30'
-                          : isFailed
-                          ? 'bg-red-500/10 border-red-500/30'
-                          : 'bg-slate-800/60 border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <span className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
-                            isCompleted
-                              ? 'bg-green-500 text-white'
-                              : isFailed
-                              ? 'bg-red-500 text-white'
-                              : canApprove
-                              ? 'bg-yellow-500 text-slate-900'
-                              : 'bg-slate-700 text-slate-400'
-                          }`}>
-                            {isCompleted ? <CheckCircle className="w-4 h-4" /> : index + 1}
-                          </span>
-                          <div>
-                            <p className={`text-sm font-medium ${
-                              isAwaitingApproval ? 'text-yellow-300' :
-                              isCompleted ? 'text-green-300' :
-                              isFailed ? 'text-red-300' :
-                              'text-slate-300'
-                            }`}>
-                              {step.name}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              {isAwaitingApproval ? 'Awaiting your approval' :
-                               isCompleted ? 'Approved & Completed' :
-                               isFailed ? 'Failed - Rejected' :
-                               step.status === 'in-progress' ? 'In Progress' :
-                               'Pending'}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Status badge */}
-                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                          isAwaitingApproval
-                            ? 'bg-yellow-500/30 text-yellow-200'
-                            : isCompleted
-                            ? 'bg-green-500/30 text-green-200'
-                            : isFailed
-                            ? 'bg-red-500/30 text-red-200'
-                            : step.status === 'in-progress'
-                            ? 'bg-blue-500/30 text-blue-200'
-                            : 'bg-slate-700 text-slate-400'
-                        }`}>
-                          {isAwaitingApproval ? 'Review' :
-                           isCompleted ? 'Approved' :
-                           isFailed ? 'Rejected' :
-                           step.status === 'in-progress' ? 'Running' :
-                           'Waiting'}
-                        </span>
-                      </div>
-
-                      {/* Approval buttons - only show for steps awaiting approval */}
-                      {isAwaitingApproval && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-700">
-                          <button
-                            onClick={handleApproveStep}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Approve
-                          </button>
-                          <button
-                            onClick={handleRejectStep}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Reject
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Next step indicator for awaiting approval */}
-                      {isAwaitingApproval && stepAwaitingApproval.nextStep && (
-                        <div className="mt-2 pt-2 border-t border-yellow-500/20">
-                          <p className="text-xs text-slate-400">
-                            Next: <span className="text-cyan-300 font-medium">{stepAwaitingApproval.nextStep}</span>
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Overall status summary */}
-              <div className="mt-4 pt-4 border-t border-slate-700">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">
-                    {workflowSteps.filter(s => s.status === 'completed').length} / {workflowSteps.length} steps approved
-                  </span>
-                  {stepAwaitingApproval && (
-                    <span className="flex items-center gap-1.5 text-yellow-300 animate-pulse">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      Action Required
-                    </span>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* â"€â"€ Issue details + TSO Window (6 cols) â"€â"€ */}
-            <section className="lg:col-span-5 space-y-6">
-              {/* Header */}
-              {/* JIRA Issue card */}
-              {jiraData && (
-                <div className="glass rounded-xl p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-2xl font-bold text-white">{jiraData.key}</span>
-                        <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-sm rounded-full">
-                          {typeof jiraData.fields.issuetype === 'string' ? jiraData.fields.issuetype : jiraData.fields.issuetype.name}
-                        </span>
-                        <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 text-sm rounded-full">
-                          {typeof jiraData.fields.status === 'string' ? jiraData.fields.status : jiraData.fields.status.name}
-                        </span>
-                      </div>
-                      <h2 className="text-xl text-white">{jiraData.fields.summary}</h2>
-                    </div>
-                    <a href={`https://jsw.ibm.com/browse/${jiraData.key}`} target="_blank" rel="noopener noreferrer"
-                      className="text-sm text-blue-300 hover:text-blue-200 flex items-center gap-1 shrink-0">
-                      Open in Jira <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-slate-400">Reporter</p>
-                      <p className="text-white">
-                        {typeof jiraData.fields.reporter === 'string' ? jiraData.fields.reporter : jiraData.fields.reporter?.displayName || 'Unassigned'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Assignee</p>
-                      <p className="text-white">
-                        {typeof jiraData.fields.assignee === 'string' ? jiraData.fields.assignee : jiraData.fields.assignee?.displayName || 'Unassigned'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Updated</p>
-                      <p className="text-white">{new Date(jiraData.fields.updated).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TSO Execution Window */}
-              <div className="glass rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">TSO Execution Window</h3>
-                  <span className={`px-3 py-1 text-xs rounded-full ${
-                    jobState.status === 'completed' ? 'bg-green-500/20 text-green-300' :
-                    jobState.status === 'failed' || jobState.status === 'rejected' ? 'bg-red-500/20 text-red-300' :
-                    jobState.status === 'running' ? 'bg-blue-500/20 text-blue-300 animate-pulse' :
-                    'bg-slate-700 text-slate-300'
-                  }`}>
-                    {jobState.status}
-                  </span>
-                </div>
-
-                {/* Analysis summary bar */}
-                {aiAnalysis && (
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded">
-                      <p className="text-[11px] text-blue-300">INTENT</p>
-                      <p className="text-sm text-white mt-1">{aiAnalysis.intent}</p>
-                    </div>
-                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded">
-                      <p className="text-[11px] text-emerald-300">REGION</p>
-                      <p className="text-sm text-white mt-1">{aiAnalysis.region || 'Not specified'}</p>
-                    </div>
-                    <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
-                      <p className="text-[11px] text-purple-300">CONFIDENCE</p>
-                      <p className="text-sm text-white mt-1">{aiAnalysis.confidence}%</p>
+                    <div className="bg-slate-800 rounded-lg p-4 overflow-x-auto max-h-96">
+                      <pre className="text-sm text-green-400 font-mono">{xmlData}</pre>
                     </div>
                   </div>
                 )}
 
-                {/* Claims to be changed */}
-                <div className="bg-slate-800/60 border border-slate-700 rounded-lg mb-4">
-                  <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-slate-700">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Claims to be Changed</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        {jobState.returnCode !== null ? `RC=${jobState.returnCode}` : 'Pending execution'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const text = (aiAnalysis?.claims || []).join('\n');
-                        navigator.clipboard.writeText(text).then(() => {
-                          setClaimsCopied(true);
-                          setTimeout(() => setClaimsCopied(false), 2000);
-                        });
-                      }}
-                      title="Copy claims to clipboard"
-                      className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
-                    >
-                      {claimsCopied ? <ClipboardCheck className="w-4 h-4 text-green-400" /> : <Clipboard className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <div className="max-h-36 overflow-y-auto p-3">
-                    {aiAnalysis && (aiAnalysis.claims || []).length > 0 ? (
-                      <ul className="space-y-1.5">
-                        {(aiAnalysis.claims || []).map((claim, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm">
-                            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] flex items-center justify-center font-bold">{i + 1}</span>
-                            <span className="text-slate-200 font-mono">{claim}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-slate-500 italic">No claims extracted</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* JCL Window */}
-                {jclContent && (
-                  <div className="glass rounded-xl p-6 mt-4">
+                {/* AI Analysis Results */}
+                {aiAnalysis && (
+                  <div className="glass rounded-xl p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold text-white">JCL Window</h3>
-                        {jobState.jobId && jobState.jobName && (
-                          <>
-                            <span className="text-slate-600">|</span>
-                            <button
-                              onClick={handleOpenSpoolViewer}
-                              className="text-cyan-400 hover:text-cyan-300 underline decoration-dotted hover:decoration-solid transition-colors text-sm font-mono"
-                              title="Click to view spool files"
-                            >
-                              {jobState.jobName}/{jobState.jobId}
-                            </button>
-                            {jobState.returnCode !== null && (
-                              <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
-                                jobState.returnCode === 0
-                                  ? 'bg-green-500/20 text-green-300'
-                                  : 'bg-red-500/20 text-red-300'
-                              }`}>
-                                CC {jobState.returnCode}
-                              </span>
-                            )}
-                          </>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <Brain className="w-6 h-6 text-purple-400" />
+                        <h3 className="text-lg font-semibold text-white">AI Analysis Results</h3>
                       </div>
-                      <div className="flex gap-2">
-                        {!isJclEditing ? (
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          aiAnalysis.confidence >= 80 ? 'bg-green-500/20 text-green-400' :
+                          aiAnalysis.confidence >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>
+                          {aiAnalysis.confidence}% Confidence
+                        </span>
+                        {!isEditingAnalysis && (
                           <button
                             onClick={() => {
-                              jclBeforeEditRef.current = jclContent;
-                              setIsJclEditing(true);
+                              setIsEditingAnalysis(true);
+                              setEditedIntent(aiAnalysis.intent);
+                              setEditedRegion(aiAnalysis.region || '');
+                              setEditedClaims(aiAnalysis.claims?.join(', ') || '');
                             }}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                            className="p-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                            title="Edit Analysis"
                           >
                             <Edit3 className="w-4 h-4" />
-                            Edit
                           </button>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => {
-                                setJclContent(jclBeforeEditRef.current);
-                                setIsJclEditing(false);
-                              }}
-                              className="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors"
-                            >
-                              Revert
-                            </button>
-                            <button
-                              onClick={() => setIsJclEditing(false)}
-                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
-                            >
-                              Done
-                            </button>
-                          </>
                         )}
                       </div>
                     </div>
+
+                    {/* Summary */}
+                    <div className="mb-4 p-4 bg-slate-800 rounded-lg">
+                      <p className="text-sm text-slate-300">{aiAnalysis.summary}</p>
+                    </div>
+
+                    {/* Structured Data */}
+                    <div className="space-y-3">
+                      {/* Intent */}
+                      <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-xs text-blue-400 font-medium mb-1">INTENT</p>
+                        {isEditingAnalysis ? (
+                          <input
+                            type="text"
+                            value={editedIntent}
+                            onChange={(e) => setEditedIntent(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"
+                          />
+                        ) : (
+                          <p className="text-white font-semibold">{aiAnalysis.intent}</p>
+                        )}
+                      </div>
+
+                      {/* Region */}
+                      {aiAnalysis.region && (
+                        <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                          <p className="text-xs text-green-400 font-medium mb-1">REGION</p>
+                          {isEditingAnalysis ? (
+                            <input
+                              type="text"
+                              value={editedRegion}
+                              onChange={(e) => setEditedRegion(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"
+                            />
+                          ) : (
+                            <p className="text-white font-semibold">{aiAnalysis.region}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Claims */}
+                      {aiAnalysis.claims && aiAnalysis.claims.length > 0 && (
+                        <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                          <p className="text-xs text-purple-400 font-medium mb-2">CLAIMS ({aiAnalysis.claims.length})</p>
+                          {isEditingAnalysis ? (
+                            <textarea
+                              value={editedClaims}
+                              onChange={(e) => setEditedClaims(e.target.value)}
+                              rows={3}
+                              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm font-mono"
+                              placeholder="Enter claims separated by commas"
+                            />
+                          ) : (
+                            <div className="space-y-1">
+                              {aiAnalysis.claims.map((claim, index) => (
+                                <p key={index} className="text-white font-mono text-sm">
+                                  {claim}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Edit Actions */}
+                      {isEditingAnalysis && (
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            onClick={handleReanalyze}
+                            disabled={isAnalyzing}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                            Re-analyze with Corrections
+                          </button>
+                          <button
+                            onClick={() => setIsEditingAnalysis(false)}
+                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI Error */}
+                    {aiError && (
+                      <div className="mt-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-300">{aiError}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Approval Section */}
+                {aiAnalysis && !isApproved && (
+                  <div className="glass rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Review & Approval</h3>
+                    <p className="text-slate-300 mb-6">
+                      Please review the AI analysis and extracted data. Confirm if everything is accurate or
+                      request changes.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleApprove}
+                        className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Approve Analysis
+                      </button>
+                      <button
+                        onClick={handleRequestChanges}
+                        className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors"
+                      >
+                        <Edit3 className="w-5 h-5" />
+                        Request Changes
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Approved Status */}
+                {isApproved && (
+                  <div className="glass rounded-xl p-6 border-2 border-green-500/50">
+                    <div className="flex items-center gap-3 mb-4">
+                      <CheckCircle className="w-8 h-8 text-green-500" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Analysis Approved</h3>
+                        <p className="text-sm text-slate-400">
+                          The AI analysis and requirements have been approved and are ready for the next phase.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 p-4 bg-green-500/10 rounded-lg">
+                      <p className="text-sm text-green-400">
+                        ✓ Requirements approved and locked
+                        <br />✓ AI analysis validated
+                        <br />✓ Ready to proceed to workflow generation
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Empty State */}
+            {!jiraData && !isLoading && !error && (
+              <div className="glass rounded-xl p-12 text-center">
+                <FileText className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">No Issue Loaded</h3>
+                <p className="text-slate-400">
+                  Enter a CSR or Issue ID above to fetch requirements and perform AI analysis
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Enhanced Console */}
+          <div className="lg:col-span-1">
+            <div className="glass rounded-xl p-6 sticky top-24">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-lg font-semibold text-white">System Console</h3>
+                  <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
+                    {filteredMessages.length}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={toggleConsoleOrder}
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
+                    title={consoleOrder === 'oldest-first' ? 'Switch to Newest First' : 'Switch to Oldest First'}
+                  >
+                    {consoleOrder === 'oldest-first' ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 rotate-[-90deg]" />
+                    )}
+                  </button>
+                  <button
+                    onClick={exportLogs}
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
+                    title="Export Logs"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={clearConsole}
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
+                    title="Clear Console"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
 
                     <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-4 font-mono text-sm overflow-x-auto">
                       {isJclEditing ? (
