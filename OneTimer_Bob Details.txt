@@ -261,7 +261,7 @@ completed and tested until this ..
 
 ------------------------------------------------------------------------------------------------------------------------------
 
-Step 3:
+Step 4:
 Chat-Based Interaction (IBM BOB Style) - Use the chat panel to guide the user:
 	Use OpenAI credentials and provide a summary of retrieved data. Summarize and generate the intent and the claim details from the CSR
 	Confirm successful fetch and transformation "Please review the retrieved requirements. Confirm if everything is accurate or suggest changes.”
@@ -274,6 +274,19 @@ Editable & Interactive XML. Allow:
 	Inline edits (optional advanced feature)
 	Section-level refinement (e.g., Summary, Acceptance Criteria)
 	Maintain versioning of updates (for traceability)
+
+------------------------------------------------------------------------------------------------------------------------------
+
+Under the section "Review & Approval", when I click "Approve Analysis" button, after the following display 
+"Analysis Approved
+The AI analysis and requirements have been approved and are ready for the next phase.
+
+✓ Requirements approved and locked
+✓ AI analysis validated
+✓ Ready to proceed to workflow generation"
+create a work flow. 
+
+
 
 System Behavior. Do not proceed to task/workflow generation until:
 	Explicit user approval is received

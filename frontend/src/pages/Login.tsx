@@ -165,7 +165,7 @@ const Login: React.FC = () => {
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">OneTimer Bob</h1>
             <p className="text-slate-400 text-sm">
-              AI-Powered Healthcare Claims Processing
+              AI-Powered One-timer Process Modernization
             </p>
           </div>
 

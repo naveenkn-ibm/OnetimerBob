@@ -6,6 +6,7 @@ import {
   LogOut,
   Search,
   FileText,
+  Bot,
   CheckCircle,
   XCircle,
   Edit3,
@@ -17,6 +18,11 @@ import {
   AlertCircle,
   RefreshCw,
   MessageSquare,
+  Zap,
+  Settings,
+  ExternalLink,
+  Calendar,
+  User,
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -56,13 +62,26 @@ interface ChatMessage {
   duration?: number;
 }
 
+interface BTPIssue {
+  key: string;
+  fields: {
+    summary: string;
+    status: {
+      name: string;
+    };
+    assignee?: {
+      displayName: string;
+    };
+    created: string;
+  };
+}
+
 const Workspace: React.FC = () => {
   const { user, logout } = useAuth();
   const [csrId, setCsrId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jiraData, setJiraData] = useState<JiraData | null>(null);
-  const [xmlData, setXmlData] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['summary']));
   const [progress, setProgress] = useState<ProgressStep | null>(null);
@@ -84,6 +103,10 @@ const Workspace: React.FC = () => {
   const [showConsoleDetails, setShowConsoleDetails] = useState<string | null>(null);
   const [consoleOrder, setConsoleOrder] = useState<'newest-first' | 'oldest-first'>('oldest-first');
   const consoleRef = React.useRef<HTMLDivElement>(null);
+  
+  // BTP Jira Issues State
+  const [btpIssues, setBtpIssues] = useState<BTPIssue[]>([]);
+  const [isBtpLoading, setIsBtpLoading] = useState(false);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -197,8 +220,9 @@ const Workspace: React.FC = () => {
     });
   };
 
-  const handleFetchJiraIssue = async () => {
-    if (!csrId.trim()) {
+  const handleFetchJiraIssue = async (issueKeyOverride?: string) => {
+    const issueKey = issueKeyOverride || csrId;
+    if (!issueKey.trim()) {
       setError('Please enter a CSR/Issue ID');
       return;
     }
@@ -207,7 +231,6 @@ const Workspace: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setJiraData(null);
-    setXmlData(null);
     setIsApproved(false);
     setAiAnalysis(null);
     setAiError(null);
@@ -215,7 +238,12 @@ const Workspace: React.FC = () => {
 
     // Enhanced logging
     addChatMessage('security', `User ${user?.tsoId} initiated issue fetch`, 'info');
-    addChatMessage('jira', `Connecting to Jira MCP server for issue: ${csrId.trim()}`, 'info');
+    addChatMessage('jira', `Connecting to Jira MCP server for issue: ${issueKey.trim()}`, 'info');
+    
+    // Update the input field if an override was provided
+    if (issueKeyOverride) {
+      setCsrId(issueKeyOverride);
+    }
 
     // Simulate progress steps
     const steps = [
@@ -239,16 +267,15 @@ const Workspace: React.FC = () => {
       }
 
       const fetchStart = Date.now();
-      const response = await api.getJiraIssue(csrId.trim());
+      const response = await api.getJiraIssue(issueKey.trim());
       const fetchDuration = Date.now() - fetchStart;
 
       if (response.success) {
         console.log('🔍 Raw API Response:', response);
         setJiraData(response.data);
-        setXmlData(response.xml || null);
         
         addChatMessage('performance', `API response received`, 'success', `Response time: ${fetchDuration}ms`, fetchDuration);
-        addChatMessage('jira', `Issue ${csrId.trim()} fetched successfully`, 'success',
+        addChatMessage('jira', `Issue ${issueKey.trim()} fetched successfully`, 'success',
           `Status: ${typeof response.data.fields.status === 'string' ? response.data.fields.status : response.data.fields.status?.name}`);
         
         setProgress({
@@ -291,7 +318,24 @@ const Workspace: React.FC = () => {
     addChatMessage('security', 'Encrypting sensitive data before transmission', 'info');
 
     try {
-      const response = await api.analyzeCSR(issueData, socket?.id);
+      // Strip attachment content to reduce payload size - only keep metadata
+      const issueDataForAI = {
+        ...issueData,
+        fields: {
+          ...issueData.fields,
+          attachment: issueData.fields.attachment?.map((att: any) => ({
+            id: att.id,
+            filename: att.filename,
+            size: att.size,
+            mimeType: att.mimeType,
+            created: att.created,
+            author: att.author,
+            // Exclude 'content' field - don't send base64 data to AI
+          }))
+        }
+      };
+      
+      const response = await api.analyzeCSR(issueDataForAI, socket?.id);
       const duration = Date.now() - startTime;
 
       if (response.success) {
@@ -339,7 +383,24 @@ const Workspace: React.FC = () => {
         claims: editedClaims ? editedClaims.split(',').map(c => c.trim()) : aiAnalysis.claims,
       };
 
-      const response = await api.reanalyzeCSR(jiraData, corrections, socket?.id);
+      // Strip attachment content for reanalysis too
+      const jiraDataForAI = {
+        ...jiraData,
+        fields: {
+          ...jiraData.fields,
+          attachment: jiraData.fields.attachment?.map((att: any) => ({
+            id: att.id,
+            filename: att.filename,
+            size: att.size,
+            mimeType: att.mimeType,
+            created: att.created,
+            author: att.author,
+            // Exclude 'content' field
+          }))
+        }
+      };
+
+      const response = await api.reanalyzeCSR(jiraDataForAI, corrections, socket?.id);
 
       if (response.success) {
         setAiAnalysis(response.data);
@@ -374,28 +435,6 @@ const Workspace: React.FC = () => {
     addChatMessage('workflow', 'Entering edit mode', 'info');
   };
 
-  const handleCopyXml = () => {
-    if (xmlData) {
-      navigator.clipboard.writeText(xmlData);
-      addChatMessage('system', 'XML copied to clipboard', 'success');
-      addChatMessage('security', 'Data copied to clipboard', 'info');
-    }
-  };
-
-  const handleDownloadXml = () => {
-    if (xmlData && jiraData) {
-      const blob = new Blob([xmlData], { type: 'application/xml' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${jiraData.key}_requirements.xml`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      addChatMessage('system', `XML file downloaded: ${jiraData.key}_requirements.xml`, 'success');
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -439,19 +478,77 @@ const Workspace: React.FC = () => {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  // Fetch BTP-* Jira issues
+  const fetchBTPIssues = async () => {
+    setIsBtpLoading(true);
+    try {
+      // For now, create mock data matching the screenshot
+      // In production, this would call a real API endpoint
+      const mockIssues: BTPIssue[] = [
+        {
+          key: 'BTP-5',
+          fields: {
+            summary: 'Restore Claims from Production',
+            status: { name: 'To Do' },
+            assignee: { displayName: 'Loranmai Gurram' },
+            created: '2024-05-22T00:00:00.000Z'
+          }
+        },
+        {
+          key: 'BTP-4',
+          fields: {
+            summary: 'Delete Pending claims',
+            status: { name: 'To Do' },
+            assignee: { displayName: 'NAVEEN NARAYAN RAO' },
+            created: '2024-05-31T00:00:00.000Z'
+          }
+        },
+        {
+          key: 'BTP-3',
+          fields: {
+            summary: 'Delete pending claims from Production env',
+            status: { name: 'To Do' },
+            assignee: undefined,
+            created: '2024-05-30T00:00:00.000Z'
+          }
+        }
+      ];
+      
+      setBtpIssues(mockIssues);
+      addChatMessage('jira', `Loaded ${mockIssues.length} BTP issues`, 'success');
+    } catch (err) {
+      console.error('Error fetching BTP issues:', err);
+      addChatMessage('jira', 'Failed to load BTP issues', 'error');
+    } finally {
+      setIsBtpLoading(false);
+    }
+  };
+
+  // Handle clicking on a BTP issue to fetch and analyze it
+  const handleBTPIssueClick = (issueKey: string) => {
+    // Directly call handleFetchJiraIssue with the issue key
+    // This will also update the csrId state
+    handleFetchJiraIssue(issueKey);
+  };
+
+  // Load BTP issues on component mount
+  useEffect(() => {
+    fetchBTPIssues();
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+                <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">OneTimer Bob</h1>
-                <p className="text-xs text-slate-400">Healthcare Claims Processing</p>
+                <p className="text-xs text-slate-400">AI-Powered One-timer Process Modernization</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -474,29 +571,29 @@ const Workspace: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <main className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* CSR Input Section */}
-            <div className="glass rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Enter CSR / Issue ID</h2>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={csrId}
-                    onChange={(e) => setCsrId(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleFetchJiraIssue()}
-                    placeholder="e.g., PROJ-123, BTP-2"
-                    disabled={isLoading}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </div>
+            {/* CSR Input Section - Compact Horizontal Layout */}
+            <div className="glass rounded-xl p-4">
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium text-white whitespace-nowrap">
+                  Enter CSR / Issue ID
+                </label>
+                <input
+                  type="text"
+                  value={csrId}
+                  onChange={(e) => setCsrId(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleFetchJiraIssue()}
+                  placeholder="BTP-02"
+                  disabled={isLoading}
+                  className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                />
                 <button
-                  onClick={handleFetchJiraIssue}
+                  onClick={() => handleFetchJiraIssue()}
                   disabled={isLoading || !csrId.trim()}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 whitespace-nowrap"
                 >
                   <Search className="w-5 h-5" />
                   Fetch & Analyze
@@ -554,7 +651,7 @@ const Workspace: React.FC = () => {
                   </div>
 
                   {/* Metadata */}
-                  <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-700">
+                  <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-700">
                     <div>
                       <p className="text-xs text-slate-400 mb-1">Reporter</p>
                       <p className="text-sm text-white">
@@ -572,6 +669,17 @@ const Workspace: React.FC = () => {
                       </p>
                     </div>
                     <div>
+                      <p className="text-xs text-slate-400 mb-1">Jira Link</p>
+                      <a
+                        href={`https://jsw.ibm.com/browse/${jiraData.key}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-400 hover:text-blue-300 underline"
+                      >
+                        {jiraData.key}
+                      </a>
+                    </div>
+                    <div>
                       <p className="text-xs text-slate-400 mb-1">Created</p>
                       <p className="text-sm text-white">{formatDate(jiraData.fields.created)}</p>
                     </div>
@@ -579,6 +687,24 @@ const Workspace: React.FC = () => {
                       <p className="text-xs text-slate-400 mb-1">Updated</p>
                       <p className="text-sm text-white">{formatDate(jiraData.fields.updated)}</p>
                     </div>
+                    {/* Attachments in third column of second row */}
+                    {jiraData.fields.attachment && jiraData.fields.attachment.length > 0 && (
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Attachments ({jiraData.fields.attachment.length})</p>
+                        <div className="flex flex-col gap-1">
+                          {jiraData.fields.attachment.map((attachment, index) => (
+                            <button
+                              key={attachment.id || `attachment-${index}`}
+                              onClick={() => handleDownloadAttachment(attachment)}
+                              className="text-sm text-blue-400 hover:text-blue-300 text-left underline w-fit"
+                              title={`Download ${attachment.filename} (${formatFileSize(attachment.size)})`}
+                            >
+                              {attachment.filename}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Labels */}
@@ -598,99 +724,28 @@ const Workspace: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Attachments */}
-                  {jiraData.fields.attachment && jiraData.fields.attachment.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-700">
-                      <p className="text-xs text-slate-400 mb-2">Attachments ({jiraData.fields.attachment.length})</p>
-                      <div className="space-y-2">
-                        {jiraData.fields.attachment.map((attachment, index) => (
-                          <div
-                            key={attachment.id || `attachment-${index}`}
-                            className="flex items-center justify-between p-3 bg-slate-800 rounded-lg hover:bg-slate-750 transition-colors"
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-white font-medium truncate">
-                                  {attachment.filename}
-                                </p>
-                                <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                                  <span>{formatFileSize(attachment.size)}</span>
-                                  {attachment.author && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{attachment.author.displayName}</span>
-                                    </>
-                                  )}
-                                  {attachment.created && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{formatDate(attachment.created)}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDownloadAttachment(attachment)}
-                              className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex-shrink-0"
-                              title={`Download ${attachment.filename}`}
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* XML Display */}
-                {xmlData && (
-                  <div className="glass rounded-xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-white">Structured Requirements (XML)</h3>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleCopyXml}
-                          className="p-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                          title="Copy XML"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={handleDownloadXml}
-                          className="p-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                          title="Download XML"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-800 rounded-lg p-4 overflow-x-auto max-h-96">
-                      <pre className="text-sm text-green-400 font-mono">{xmlData}</pre>
-                    </div>
-                  </div>
-                )}
 
                 {/* AI Analysis Results */}
                 {aiAnalysis && (
                   <div className="glass rounded-xl p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <Brain className="w-6 h-6 text-purple-400" />
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Brain className="w-6 h-6 text-white" />
+                        </div>
                         <h3 className="text-lg font-semibold text-white">AI Analysis Results</h3>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                           aiAnalysis.confidence >= 80 ? 'bg-green-500/20 text-green-400' :
                           aiAnalysis.confidence >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
                           'bg-red-500/20 text-red-400'
                         }`}>
                           {aiAnalysis.confidence}% Confidence
                         </span>
-                        {!isEditingAnalysis && (
+                        {!isEditingAnalysis && !isApproved && (
                           <button
                             onClick={() => {
                               setIsEditingAnalysis(true);
@@ -707,88 +762,151 @@ const Workspace: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Summary */}
-                    <div className="mb-4 p-4 bg-slate-800 rounded-lg">
-                      <p className="text-sm text-slate-300">{aiAnalysis.summary}</p>
-                    </div>
-
-                    {/* Structured Data */}
-                    <div className="space-y-3">
-                      {/* Intent */}
-                      <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <p className="text-xs text-blue-400 font-medium mb-1">INTENT</p>
-                        {isEditingAnalysis ? (
-                          <input
-                            type="text"
-                            value={editedIntent}
-                            onChange={(e) => setEditedIntent(e.target.value)}
-                            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"
-                          />
-                        ) : (
-                          <p className="text-white font-semibold">{aiAnalysis.intent}</p>
-                        )}
-                      </div>
-
-                      {/* Region */}
-                      {aiAnalysis.region && (
-                        <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-                          <p className="text-xs text-green-400 font-medium mb-1">REGION</p>
-                          {isEditingAnalysis ? (
-                            <input
-                              type="text"
-                              value={editedRegion}
-                              onChange={(e) => setEditedRegion(e.target.value)}
-                              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm"
-                            />
-                          ) : (
-                            <p className="text-white font-semibold">{aiAnalysis.region}</p>
-                          )}
+                    {/* Two-column layout: Left (Summary, Intent, Region, Claims) and Right (Approval Status) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* Left Column - Content (2 columns width) */}
+                      <div className="lg:col-span-2 space-y-4">
+                        {/* Summary */}
+                        <div className="p-4 bg-slate-800/50 rounded-lg">
+                          <p className="text-sm text-slate-400 leading-relaxed">{aiAnalysis.summary}</p>
                         </div>
-                      )}
 
-                      {/* Claims */}
-                      {aiAnalysis.claims && aiAnalysis.claims.length > 0 && (
-                        <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                          <p className="text-xs text-purple-400 font-medium mb-2">CLAIMS ({aiAnalysis.claims.length})</p>
-                          {isEditingAnalysis ? (
-                            <textarea
-                              value={editedClaims}
-                              onChange={(e) => setEditedClaims(e.target.value)}
-                              rows={3}
-                              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm font-mono"
-                              placeholder="Enter claims separated by commas"
-                            />
-                          ) : (
-                            <div className="space-y-1">
-                              {aiAnalysis.claims.map((claim, index) => (
-                                <p key={index} className="text-white font-mono text-sm">
-                                  {claim}
-                                </p>
-                              ))}
+                        {/* Intent and Region badges - Justified spacing */}
+                        <div className="flex items-center justify-between gap-4">
+                          {/* Intent Badge */}
+                          <div className="flex-1 flex flex-col items-center gap-1 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded">
+                            <span className="text-xs text-blue-400 font-medium">INTENT</span>
+                            {isEditingAnalysis ? (
+                              <input
+                                type="text"
+                                value={editedIntent}
+                                onChange={(e) => setEditedIntent(e.target.value)}
+                                className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-white text-xs w-32 text-center"
+                              />
+                            ) : (
+                              <span className="text-white text-xs font-semibold">{aiAnalysis.intent}</span>
+                            )}
+                          </div>
+
+                          {/* Region Badge */}
+                          {aiAnalysis.region && (
+                            <div className="flex-1 flex flex-col items-center gap-1 px-3 py-2 bg-green-500/10 border border-green-500/30 rounded">
+                              <span className="text-xs text-green-400 font-medium">REGION</span>
+                              {isEditingAnalysis ? (
+                                <input
+                                  type="text"
+                                  value={editedRegion}
+                                  onChange={(e) => setEditedRegion(e.target.value)}
+                                  className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-white text-xs w-32 text-center"
+                                />
+                              ) : (
+                                <span className="text-white text-xs font-semibold">{aiAnalysis.region}</span>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
 
-                      {/* Edit Actions */}
-                      {isEditingAnalysis && (
-                        <div className="flex gap-3 pt-2">
-                          <button
-                            onClick={handleReanalyze}
-                            disabled={isAnalyzing}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                            Re-analyze with Corrections
-                          </button>
-                          <button
-                            onClick={() => setIsEditingAnalysis(false)}
-                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
+                        {/* Claims Section */}
+                        {aiAnalysis.claims && aiAnalysis.claims.length > 0 && (
+                          <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                            <p className="text-xs text-purple-400 font-medium mb-2">CLAIMS ({aiAnalysis.claims.length})</p>
+                            {isEditingAnalysis ? (
+                              <textarea
+                                value={editedClaims}
+                                onChange={(e) => setEditedClaims(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm font-mono"
+                                placeholder="Enter claims separated by commas"
+                              />
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2">
+                                {aiAnalysis.claims.map((claim, index) => (
+                                  <p key={index} className="text-white font-mono text-sm">
+                                    {claim}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Edit Actions */}
+                        {isEditingAnalysis && (
+                          <div className="flex gap-3">
+                            <button
+                              onClick={handleReanalyze}
+                              disabled={isAnalyzing}
+                              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                              Re-analyze with Corrections
+                            </button>
+                            <button
+                              onClick={() => setIsEditingAnalysis(false)}
+                              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right Column - Approval Status (1 column width) */}
+                      <div className="lg:col-span-1">
+                        {!isApproved ? (
+                          <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg h-full flex flex-col">
+                            <h3 className="text-base font-semibold text-white mb-3">Review & Approval</h3>
+                            <p className="text-slate-300 text-sm mb-4 flex-1">
+                              Please review the AI analysis and extracted data. Confirm if everything is accurate or request changes.
+                            </p>
+                            <div className="flex flex-col gap-2">
+                              <button
+                                onClick={handleApprove}
+                                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                Approve
+                              </button>
+                              <button
+                                onClick={handleRequestChanges}
+                                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                                Request Changes
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-green-500/10 border-2 border-green-500/50 rounded-lg h-full flex flex-col">
+                            <div className="flex items-start gap-2 mb-3">
+                              <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
+                              <h3 className="text-base font-semibold text-white">Analysis Approved</h3>
+                            </div>
+                            <div className="p-3 bg-slate-800/50 rounded-lg mb-3">
+                              <p className="text-xs text-slate-300">
+                                The AI analysis and requirements have been approved and are ready for the next phase.
+                              </p>
+                            </div>
+                            <div className="p-3 bg-green-500/10 rounded-lg mb-3">
+                              <p className="text-xs text-green-400">
+                                ✓ Requirements approved and locked
+                                <br />✓ AI analysis validated
+                                <br />✓ Ready to proceed to workflow generation
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                addChatMessage('workflow', 'Starting workflow generation...', 'info');
+                                // TODO: Implement workflow generation in Step 5
+                              }}
+                              className="mt-auto w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all"
+                            >
+                              <Zap className="w-5 h-5" />
+                              Start Workflow
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* AI Error */}
@@ -798,55 +916,6 @@ const Workspace: React.FC = () => {
                         <p className="text-sm text-red-300">{aiError}</p>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Approval Section */}
-                {aiAnalysis && !isApproved && (
-                  <div className="glass rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-white mb-4">Review & Approval</h3>
-                    <p className="text-slate-300 mb-6">
-                      Please review the AI analysis and extracted data. Confirm if everything is accurate or
-                      request changes.
-                    </p>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleApprove}
-                        className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-                      >
-                        <CheckCircle className="w-5 h-5" />
-                        Approve Analysis
-                      </button>
-                      <button
-                        onClick={handleRequestChanges}
-                        className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors"
-                      >
-                        <Edit3 className="w-5 h-5" />
-                        Request Changes
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Approved Status */}
-                {isApproved && (
-                  <div className="glass rounded-xl p-6 border-2 border-green-500/50">
-                    <div className="flex items-center gap-3 mb-4">
-                      <CheckCircle className="w-8 h-8 text-green-500" />
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">Analysis Approved</h3>
-                        <p className="text-sm text-slate-400">
-                          The AI analysis and requirements have been approved and are ready for the next phase.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 p-4 bg-green-500/10 rounded-lg">
-                      <p className="text-sm text-green-400">
-                        ✓ Requirements approved and locked
-                        <br />✓ AI analysis validated
-                        <br />✓ Ready to proceed to workflow generation
-                      </p>
-                    </div>
                   </div>
                 )}
               </>
@@ -864,7 +933,98 @@ const Workspace: React.FC = () => {
             )}
           </div>
 
-          {/* Right Column - Enhanced Console */}
+          {/* Middle Column - Jira Integration */}
+          <div className="lg:col-span-1">
+            <div className="glass rounded-xl p-4 sticky top-24">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-base font-semibold text-white">JIRA INTEGRATION</h3>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={fetchBTPIssues}
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
+                    title="Refresh"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isBtpLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
+                    title="Settings"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <p className="text-xs text-slate-400">5 stories in BTP</p>
+              </div>
+
+              {/* BTP Issues List */}
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {isBtpLoading ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="w-6 h-6 text-blue-400 animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">Loading issues...</p>
+                  </div>
+                ) : btpIssues.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-slate-400">No BTP issues found</p>
+                  </div>
+                ) : (
+                  btpIssues.map((issue) => (
+                    <div
+                      key={issue.key}
+                      onClick={() => handleBTPIssueClick(issue.key)}
+                      className="block bg-slate-800/50 border border-slate-700 rounded-lg p-3 hover:border-blue-500/50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-400 font-mono text-sm font-semibold hover:text-blue-300 transition-colors">
+                            {issue.key}
+                          </span>
+                          <span className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">
+                            {issue.fields.status.name}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <h4 className="text-sm text-white font-medium mb-2 line-clamp-2">
+                        {issue.fields.summary}
+                      </h4>
+                      
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <div className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          <span>{issue.fields.assignee?.displayName || 'Unassigned'}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          <span>{new Date(issue.fields.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-700">
+                <a
+                  href="https://jsw.ibm.com/browse/BTP"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  <span>View all stories in Jira</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - System Console */}
           <div className="lg:col-span-1">
             <div className="glass rounded-xl p-6 sticky top-24">
               <div className="flex items-center justify-between mb-4">
