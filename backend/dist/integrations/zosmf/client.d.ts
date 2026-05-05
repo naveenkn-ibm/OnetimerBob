@@ -99,6 +99,13 @@ export declare class ZOSMFClient {
      */
     getJobOutput(jobName: string, jobId: string, token: string): Promise<string>;
     /**
+     * Get job by ID only (searches for job across all job names)
+     * @param jobId - Job ID
+     * @param token - LTPA authentication token
+     * @returns Job information
+     */
+    getJobById(jobId: string, token: string): Promise<any>;
+    /**
      * List datasets matching a pattern
      * @param pattern - Dataset name pattern (e.g., "Z12345.*")
      * @param token - LTPA authentication token

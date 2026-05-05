@@ -326,6 +326,39 @@ export class ZOSMFClient {
   }
 
   /**
+   * Get job by ID only (searches for job across all job names)
+   * @param jobId - Job ID
+   * @param token - LTPA authentication token
+   * @returns Job information
+   */
+  async getJobById(jobId: string, token: string): Promise<any> {
+    try {
+      // z/OSMF allows querying by jobid parameter
+      const response = await this.axiosInstance.get(
+        `/zosmf/restjobs/jobs`,
+        {
+          params: {
+            jobid: jobId,
+          },
+          headers: {
+            'Cookie': token,
+          },
+        }
+      );
+
+      const jobs = response.data;
+      if (!jobs || jobs.length === 0) {
+        throw new Error(`Job ${jobId} not found`);
+      }
+
+      return jobs[0]; // Return first match
+    } catch (error) {
+      logError('Failed to get job by ID', error, { jobId });
+      throw this.createError(error, 'Failed to get job by ID');
+    }
+  }
+
+  /**
    * List datasets matching a pattern
    * @param pattern - Dataset name pattern (e.g., "Z12345.*")
    * @param token - LTPA authentication token

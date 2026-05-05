@@ -115,17 +115,27 @@ class JiraService {
             if (responseText.startsWith('Error')) {
                 // Parse the error message to provide user-friendly feedback
                 const errorMsg = responseText.toLowerCase();
+                // Authentication/Authorization errors (403)
+                if (errorMsg.includes('authentication failed') ||
+                    errorMsg.includes('403') ||
+                    errorMsg.includes('token may be expired') ||
+                    errorMsg.includes('verify credentials')) {
+                    throw new Error(`Jira authentication failed. Your Jira credentials may be expired or invalid. Please contact your administrator to verify your Jira access.`);
+                }
+                // Issue not found (404)
                 if (errorMsg.includes('not found') || errorMsg.includes('does not exist')) {
                     throw new Error(`Issue "${issueKey}" not found in Jira. Please verify the issue key and try again.`);
                 }
+                // Permission denied (403 - different from auth failure)
                 if (errorMsg.includes('permission') || errorMsg.includes('access denied')) {
-                    throw new Error(`Access denied to issue "${issueKey}". Please check your Jira permissions.`);
+                    throw new Error(`Access denied to issue "${issueKey}". You may not have permission to view this issue.`);
                 }
+                // Validation error (400)
                 if (errorMsg.includes('validation error')) {
                     throw new Error(`Invalid issue key format: "${issueKey}". Expected format: PROJECT-NUMBER (e.g., BTP-2, PROJ-123)`);
                 }
-                // Generic error
-                throw new Error(`Failed to fetch issue "${issueKey}": ${responseText}`);
+                // Generic error - include the actual error message
+                throw new Error(`Failed to fetch issue "${issueKey}": ${responseText.replace('Error calling tool \'get_issue\': ', '')}`);
             }
             // Parse JSON response
             let issueData;
@@ -139,6 +149,43 @@ class JiraService {
             // Validate that we got actual issue data
             if (!issueData || !issueData.key) {
                 throw new Error(`Issue "${issueKey}" not found in Jira. Please verify the issue key exists.`);
+            }
+            // Fetch attachments for this issue
+            try {
+                (0, logger_1.logInfo)('Fetching attachments for issue', { issueKey });
+                const attachmentResult = await this.mcpClient.callTool({
+                    name: 'jira_download_attachments',
+                    arguments: {
+                        issue_key: issueKey.trim(),
+                    },
+                });
+                // Parse attachment response
+                if (attachmentResult.content && Array.isArray(attachmentResult.content)) {
+                    const attachments = [];
+                    // First item is the summary text, rest are embedded resources
+                    for (let i = 1; i < attachmentResult.content.length; i++) {
+                        const item = attachmentResult.content[i];
+                        if (item.type === 'resource' && 'resource' in item) {
+                            const resource = item.resource;
+                            attachments.push({
+                                id: resource.uri || `attachment-${i}`,
+                                filename: resource.uri?.split('/').pop() || `attachment-${i}`,
+                                size: resource.blob ? Buffer.from(resource.blob, 'base64').length : 0,
+                                mimeType: resource.mimeType || 'application/octet-stream',
+                                content: resource.blob || '',
+                                created: new Date().toISOString(),
+                            });
+                        }
+                    }
+                    if (attachments.length > 0) {
+                        (0, logger_1.logInfo)(`Found ${attachments.length} attachment(s)`, { issueKey });
+                        issueData.attachment = attachments;
+                    }
+                }
+            }
+            catch (attachmentError) {
+                // Log but don't fail the entire request if attachments fail
+                (0, logger_1.logError)('Failed to fetch attachments', attachmentError, { issueKey });
             }
             (0, logger_1.logInfo)('Successfully fetched Jira issue', { issueKey });
             return this.transformJiraData(issueData);
@@ -220,8 +267,12 @@ class JiraService {
             updated: fields.updated,
             labels: fields.labels || [],
         };
+        // Preserve attachment data if present (added from rawData, not fields)
+        if (rawData.attachment) {
+            transformedFields.attachment = rawData.attachment;
+        }
         // Add any additional fields that don't conflict with our transformed ones
-        const excludeKeys = ['summary', 'description', 'status', 'issuetype', 'issue_type', 'priority', 'assignee', 'reporter', 'created', 'updated', 'labels'];
+        const excludeKeys = ['summary', 'description', 'status', 'issuetype', 'issue_type', 'priority', 'assignee', 'reporter', 'created', 'updated', 'labels', 'attachment'];
         Object.keys(fields).forEach(key => {
             if (!excludeKeys.includes(key)) {
                 transformedFields[key] = fields[key];

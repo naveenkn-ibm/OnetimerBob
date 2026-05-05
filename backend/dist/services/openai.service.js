@@ -90,7 +90,7 @@ Extract the intent and claim details from this issue.`;
             return this.parseJSONResponse(response);
         }
         catch (error) {
-            logger.error('OpenAI analysis failed:', error);
+            (0, logger_1.logError)('OpenAI analysis failed', error);
             throw this.handleOpenAIError(error);
         }
     }
@@ -138,7 +138,7 @@ Generate a clean, well-structured XML document.`;
             return response.trim();
         }
         catch (error) {
-            logger.error('XML generation failed:', error);
+            (0, logger_1.logError)('XML generation failed', error);
             throw this.handleOpenAIError(error);
         }
     }
@@ -191,7 +191,7 @@ Create a logical task breakdown with workflow sequence.`;
             return this.parseJSONResponse(response);
         }
         catch (error) {
-            logger.error('Task breakdown generation failed:', error);
+            (0, logger_1.logError)('Task breakdown generation failed', error);
             throw this.handleOpenAIError(error);
         }
     }
@@ -274,7 +274,7 @@ NEEDS_CONFIRMATION: true`;
             };
         }
         catch (error) {
-            logger.error('Agent chat failed:', error);
+            (0, logger_1.logError)('Agent chat failed', error);
             throw this.handleOpenAIError(error);
         }
     }
@@ -323,7 +323,7 @@ Guidelines:
             return this.parseJSONResponse(response);
         }
         catch (error) {
-            logger.error('Output explanation failed:', error);
+            (0, logger_1.logError)('Output explanation failed', error);
             throw this.handleOpenAIError(error);
         }
     }

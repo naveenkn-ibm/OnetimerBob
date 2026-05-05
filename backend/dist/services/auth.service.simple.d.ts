@@ -27,6 +27,7 @@ export interface ProgressUpdate {
     status: 'in_progress' | 'completed' | 'error';
 }
 export declare class AuthService {
+    private static mainframeSessionByUser;
     private zosmfClient;
     private jwtSecret;
     private jwtExpiresIn;
@@ -57,6 +58,7 @@ export declare class AuthService {
         success: boolean;
         message: string;
     }>;
+    static getMainframeToken(tsoId: string): string | undefined;
     /**
      * Emit progress update via WebSocket
      */

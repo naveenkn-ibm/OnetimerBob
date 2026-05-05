@@ -261,7 +261,7 @@ completed and tested until this ..
 
 ------------------------------------------------------------------------------------------------------------------------------
 
-Step 3:
+Step 4:
 Chat-Based Interaction (IBM BOB Style) - Use the chat panel to guide the user:
 	Use OpenAI credentials and provide a summary of retrieved data. Summarize and generate the intent and the claim details from the CSR
 	Confirm successful fetch and transformation "Please review the retrieved requirements. Confirm if everything is accurate or suggest changes.”
@@ -274,6 +274,19 @@ Editable & Interactive XML. Allow:
 	Inline edits (optional advanced feature)
 	Section-level refinement (e.g., Summary, Acceptance Criteria)
 	Maintain versioning of updates (for traceability)
+
+------------------------------------------------------------------------------------------------------------------------------
+
+Under the section "Review & Approval", when I click "Approve Analysis" button, after the following display 
+"Analysis Approved
+The AI analysis and requirements have been approved and are ready for the next phase.
+
+✓ Requirements approved and locked
+✓ AI analysis validated
+✓ Ready to proceed to workflow generation"
+create a work flow. 
+
+
 
 System Behavior. Do not proceed to task/workflow generation until:
 	Explicit user approval is received
@@ -336,6 +349,42 @@ Ensure that the retrieved and structured requirements (from Jira) are validated 
 We transformed a manual, multi-day mainframe process into an agentic, approval-driven workflow using IBM BOB, reducing execution time and human effort significantly
 
 
+
+
+* When the **“Start Workflow”** button is clicked, initialize all workflow checkpoints with status **“Yet to Start”**
+* Immediately transition the **“Pull Claims JCL”** checkpoint to **“In Progress”**
+* Load the pull_cliams JCL into a new editor and called it as "JCL Window" just below the existing "TSO Execution Window".
+  * Provide syntax-highlighted view
+  * Allow inline editing
+
+* Pause the workflow and enforce **Human-in-the-Loop validation**
+  * Wait for user action (Approve / Reject)
+  * Do not proceed until approval is given
+* Upon clicking **Approve**:
+  * Submit the JCL using existing **z/OS mainframe connectivity**
+  * Maintain checkpoint status as **“In Progress”** during submission
+* After successful submission:
+  * Capture **Job Name** and **Job ID**
+  * Display them in the **System Console** as clickable links
+* On clicking Job link:
+  * Open a **Job Spool Viewer**
+  * Display:
+    * JESMSGLG
+    * JESJCL
+    * JESYSMSG
+    * SYSOUT
+    * Return Code (RC)
+    * Execution logs
+* Continuously monitor job execution status
+  * States: Submitted → Running → Completed / Failed
+* Once execution completes:
+  * Update checkpoint status to:
+    * **“Completed”** if RC = 0
+    * **“Failed”** if RC ≠ 0
+* Ensure UI reflects:
+  * Real-time status updates
+  * Full job visibility
+  * Proper audit and control flow
 
 
 

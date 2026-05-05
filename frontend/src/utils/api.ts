@@ -115,6 +115,60 @@ export interface AIAnalysisResponse {
   message: string;
 }
 
+export interface TSOExecuteRequest {
+  issueKey: string;
+  socketId?: string;
+  workflowSteps?: string[];
+  analysis: {
+    intent: string;
+    region?: string;
+    claims?: string[];
+    summary?: string;
+  };
+}
+
+export interface TSOExecuteResponse {
+  success: boolean;
+  jobId: string;
+  jobName: string;
+  message: string;
+}
+
+export interface TSOJobStatusResponse {
+  success: boolean;
+  data: {
+    jobId: string;
+    jobName: string;
+    owner: string;
+    status: 'queued' | 'active' | 'output' | 'closed' | 'failed';
+    returnCode?: number;
+    stepInfo: Array<{
+      step: string;
+      status: string;
+      rc?: number;
+    }>;
+    spoolFiles: Array<{
+      id: string;
+      ddname?: string;
+      stepname?: string;
+      procstep?: string;
+      class?: string;
+      linesCount: number;
+    }>;
+    updatedAt: string;
+  };
+}
+
+export interface TSOSpoolResponse {
+  success: boolean;
+  data: {
+    jobId: string;
+    fileId: string;
+    lines: string[];
+    totalLines: number;
+  };
+}
+
 export interface ApiError {
   message: string;
   code?: string;
@@ -178,6 +232,21 @@ export const api = {
 
   getAIStatus: async (): Promise<{ success: boolean; available: boolean; message: string }> => {
     const response = await apiClient.get('/ai/status');
+    return response.data;
+  },
+
+  executeTSO: async (payload: TSOExecuteRequest): Promise<TSOExecuteResponse> => {
+    const response = await apiClient.post<TSOExecuteResponse>('/tso/execute', payload);
+    return response.data;
+  },
+
+  getTSOStatus: async (jobId: string): Promise<TSOJobStatusResponse> => {
+    const response = await apiClient.get<TSOJobStatusResponse>(`/tso/status/${jobId}`);
+    return response.data;
+  },
+
+  getTSOSpool: async (jobId: string, fileId: string): Promise<TSOSpoolResponse> => {
+    const response = await apiClient.get<TSOSpoolResponse>(`/tso/spool/${jobId}/${fileId}`);
     return response.data;
   },
 

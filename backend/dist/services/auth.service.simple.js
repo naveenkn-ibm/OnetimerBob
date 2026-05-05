@@ -8,6 +8,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const client_1 = require("@integrations/zosmf/client");
 const logger_1 = require("@utils/logger");
 class AuthService {
+    static mainframeSessionByUser = new Map();
     zosmfClient;
     jwtSecret;
     jwtExpiresIn;
@@ -84,6 +85,14 @@ class AuthService {
                 percentage: 100,
                 status: 'completed',
             });
+            // Track mainframe session in-memory for downstream TSO execution.
+            if (authResult.token) {
+                AuthService.mainframeSessionByUser.set(tsoId, {
+                    ltpaToken: authResult.token,
+                    sessionId: authResult.sessionId,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
             // Generate JWT token
             const token = jsonwebtoken_1.default.sign({
                 tsoId,
@@ -159,13 +168,13 @@ class AuthService {
                 sessionId: decoded.sessionId
             });
             // Step 1: Close mainframe session
-            // Extract LTPA token from JWT if it was stored
-            // For now, we'll attempt logout with the JWT token itself
             try {
                 (0, logger_1.logInfo)('Closing mainframe session', { tsoId: decoded.tsoId });
-                // Note: In production, you'd extract the actual LTPA token from storage
-                // For now, we log the attempt and let z/OSMF sessions auto-expire
-                const mainframeLogout = await this.zosmfClient.logout(token);
+                const activeSession = AuthService.mainframeSessionByUser.get(decoded.tsoId);
+                const sessionToken = activeSession?.ltpaToken;
+                const mainframeLogout = sessionToken
+                    ? await this.zosmfClient.logout(sessionToken)
+                    : { success: true, message: 'No active mainframe token found' };
                 if (mainframeLogout.success) {
                     (0, logger_1.logInfo)('Mainframe session closed successfully', { tsoId: decoded.tsoId });
                 }
@@ -182,6 +191,7 @@ class AuthService {
                     tsoId: decoded.tsoId
                 });
             }
+            AuthService.mainframeSessionByUser.delete(decoded.tsoId);
             // Step 2: Log successful logout
             (0, logger_1.logInfo)('Logout successful - all resources cleaned', { tsoId: decoded.tsoId });
             (0, logger_1.logAudit)('LOGOUT', decoded.tsoId, {
@@ -201,6 +211,9 @@ class AuthService {
                 message: 'Logout failed - token may be invalid'
             };
         }
+    }
+    static getMainframeToken(tsoId) {
+        return AuthService.mainframeSessionByUser.get(tsoId)?.ltpaToken;
     }
     /**
      * Emit progress update via WebSocket

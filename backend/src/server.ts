@@ -10,6 +10,7 @@ import cors from 'cors';
 import { AuthController } from '@controllers/auth.controller';
 import { JiraController } from '@controllers/jira.controller';
 import { AIController } from '@controllers/ai.controller';
+import { TSOController } from '@controllers/tso.controller';
 import { logInfo, logError } from '@utils/logger';
 
 /**
@@ -35,8 +36,9 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase body size limit to handle large Jira attachments (base64 encoded)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request logging middleware
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -52,6 +54,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 const authController = new AuthController(io);
 const jiraController = new JiraController();
 const aiController = new AIController(io);
+const tsoController = new TSOController(io);
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
@@ -79,6 +82,11 @@ apiRouter.post('/jira/issue', jiraController.getIssue.bind(jiraController));
 apiRouter.post('/ai/analyze', aiController.analyzeCSR);
 apiRouter.post('/ai/reanalyze', aiController.reanalyze);
 apiRouter.get('/ai/status', aiController.getStatus);
+
+// TSO execution routes
+apiRouter.post('/tso/execute', tsoController.executeTSO);
+apiRouter.get('/tso/status/:jobId', tsoController.getJobStatus);
+apiRouter.get('/tso/spool/:jobId/:fileId', tsoController.getSpoolContent);
 
 // Mount API router
 app.use('/api', apiRouter);
@@ -118,6 +126,12 @@ io.on('connection', (socket) => {
     socket.emit('auth:subscribed', { socketId: socket.id });
   });
 
+  // Handle step approval — user approved the completed step, continue to next
+  socket.on('tso:step-approve', (data?: { jcl?: string }) => {
+    logInfo('Step approval received', { socketId: socket.id });
+    tsoController.approveStep(socket.id, data?.jcl);
+  });
+
   // Handle ping for connection testing
   socket.on('ping', () => {
     socket.emit('pong', { timestamp: new Date().toISOString() });
@@ -150,6 +164,9 @@ httpServer.listen(PORT, () => {
   console.log('  POST   /api/ai/analyze');
   console.log('  POST   /api/ai/reanalyze');
   console.log('  GET    /api/ai/status');
+  console.log('  POST   /api/tso/execute');
+  console.log('  GET    /api/tso/status/:jobId');
+  console.log('  GET    /api/tso/spool/:jobId/:fileId');
   console.log('  GET    /health');
   console.log('');
   console.log('💡 To stop the server: Press Ctrl+C');

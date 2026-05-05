@@ -229,8 +229,8 @@ Respond ONLY with valid JSON in this exact structure:
     // Check if claims are in valid format (if present)
     if (result.claims && result.claims.length > 0) {
       result.claims.forEach((claim, index) => {
-        if (!claim || claim.trim().length === 0) {
-          issues.push(`Claim ${index + 1} is empty`);
+        if (!claim || typeof claim !== 'string' || claim.trim().length === 0) {
+          issues.push(`Claim ${index + 1} is empty or invalid`);
         }
       });
     }

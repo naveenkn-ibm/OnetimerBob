@@ -4,8 +4,9 @@ import ProgressBar from '../components/ProgressBar';
 import { Eye, EyeOff, Lock, User, Server, CheckCircle } from 'lucide-react';
 
 const Login: React.FC = () => {
-  const [tsoId, setTsoId] = useState('');
-  const [password, setPassword] = useState('');
+  // Auto-populate from environment variables if available (development only)
+  const [tsoId, setTsoId] = useState(import.meta.env.VITE_TSO_ID || '');
+  const [password, setPassword] = useState(import.meta.env.VITE_TSO_PASSWORD || '');
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -165,7 +166,7 @@ const Login: React.FC = () => {
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">OneTimer Bob</h1>
             <p className="text-slate-400 text-sm">
-              AI-Powered Healthcare Claims Processing
+              AI-Powered One-timer Process Modernization
             </p>
           </div>
 
