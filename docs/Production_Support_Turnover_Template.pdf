@@ -1,0 +1,442 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R] /Count 6 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 2380 >>
+stream
+BT
+/F1 9 Tf
+40 760 Td
+(Production Support Turnover Document Template) Tj
+0 -12 Td (=============================================) Tj
+0 -12 Td () Tj
+0 -12 Td (Mainframe Healthcare Claim Processing Project) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (1. Document Control) Tj
+0 -12 Td (-------------------) Tj
+0 -12 Td (Item                           | Details) Tj
+0 -12 Td (Project Name                   |) Tj
+0 -12 Td (Application/System Name        |) Tj
+0 -12 Td (Business Area                  | Healthcare Claims Processing) Tj
+0 -12 Td (Document Version               |) Tj
+0 -12 Td (Prepared By                    |) Tj
+0 -12 Td (Reviewed By                    |) Tj
+0 -12 Td (Approved By                    |) Tj
+0 -12 Td (Date                           |) Tj
+0 -12 Td (Production Implementation Date |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (2. Purpose of the Document) Tj
+0 -12 Td (--------------------------) Tj
+0 -12 Td (This document provides the production support team with the functional, technical, operational,) Tj
+0 -12 Td (and support information required to maintain and support the healthcare claim processing) Tj
+0 -12 Td (application after production deployment.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (3. Project Overview) Tj
+0 -12 Td (-------------------) Tj
+0 -12 Td () Tj
+0 -12 Td (3.1 Business Objective) Tj
+0 -12 Td (Describe the purpose of the project, such as enhancements to claim intake, validation,) Tj
+0 -12 Td (adjudication, pricing, payment generation, reporting, or regulatory processing.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (3.2 Scope) Tj
+0 -12 Td (In Scope | Out of Scope) Tj
+0 -12 Td (         |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (3.3 Key Business Functions) Tj
+0 -12 Td (  ? Claim intake) Tj
+0 -12 Td (  ? Claim validation) Tj
+0 -12 Td (  ? Member eligibility check) Tj
+0 -12 Td (  ? Provider validation) Tj
+0 -12 Td (  ? Benefit determination) Tj
+0 -12 Td (  ? Claim adjudication) Tj
+0 -12 Td (  ? Pricing) Tj
+0 -12 Td (  ? Payment generation) Tj
+0 -12 Td (  ? Explanation of Benefits/Explanation of Payment generation) Tj
+0 -12 Td (  ? Reporting and audit feeds) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (4. Application/System Details) Tj
+0 -12 Td (-----------------------------) Tj
+0 -12 Td (Item                  | Details) Tj
+0 -12 Td (Application Name      |) Tj
+0 -12 Td (Mainframe Platform    | z/OS) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 2702 >>
+stream
+BT
+/F1 9 Tf
+40 760 Td
+(Languages Used        | COBOL, JCL, CICS, DB2, VSAM, Easytrieve, REXX, etc.) Tj
+0 -12 Td (Online/Batch          |) Tj
+0 -12 Td (Database/File Systems | DB2, VSAM, GDG, flat files) Tj
+0 -12 Td (Scheduler             | CA7 / Control-M / OPC / Other) Tj
+0 -12 Td (Source Control        | Endevor / Changeman / Git / Other) Tj
+0 -12 Td (Production Region     |) Tj
+0 -12 Td (Test Region           |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (5. Business Contacts) Tj
+0 -12 Td (--------------------) Tj
+0 -12 Td (Role           | Name | Email | Phone) Tj
+0 -12 Td (Business Owner |      |       |) Tj
+0 -12 Td (Product Owner  |      |       |) Tj
+0 -12 Td (Claims SME     |      |       |) Tj
+0 -12 Td (QA Lead        |      |       |) Tj
+0 -12 Td (UAT Contact    |      |       |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (6. Technical Contacts) Tj
+0 -12 Td (---------------------) Tj
+0 -12 Td (Role                    | Name | Email | Phone) Tj
+0 -12 Td (Application Lead        |      |       |) Tj
+0 -12 Td (Mainframe Developer     |      |       |) Tj
+0 -12 Td (DB2 DBA                 |      |       |) Tj
+0 -12 Td (Batch Support           |      |       |) Tj
+0 -12 Td (Infrastructure Support  |      |       |) Tj
+0 -12 Td (Production Support Lead |      |       |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (7. Application Architecture) Tj
+0 -12 Td (---------------------------) Tj
+0 -12 Td () Tj
+0 -12 Td (7.1 High-Level Claim Flow) Tj
+0 -12 Td (  1. Claim file is received from upstream system.) Tj
+0 -12 Td (  2. Batch job validates file format.) Tj
+0 -12 Td (  3. Claims are loaded into staging tables/files.) Tj
+0 -12 Td (  4. Claim edits and business validations are applied.) Tj
+0 -12 Td (  5. Claims are adjudicated.) Tj
+0 -12 Td (  6. Payment or denial decision is generated.) Tj
+0 -12 Td (  7. Output files/reports are sent to downstream systems.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (7.2 Interfaces) Tj
+0 -12 Td (Interface Name | Source | Target               | Frequency | File/Table | Contact) Tj
+0 -12 Td (               |        | Daily/Weekly/Monthly |           |            |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (8. Batch Job Details) Tj
+0 -12 Td (--------------------) Tj
+0 -12 Td (Job Name | Description | Frequency | Predecessor | Successor | SLA) Tj
+0 -12 Td (         |             | Daily     |             |           |) Tj
+0 -12 Td () Tj
+0 -12 Td (For each critical job, capture: purpose, schedule, input files, output files, programs called,) Tj
+0 -12 Td (DB2 tables used, VSAM files used, restart step, common abend codes, and recovery procedure.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (9. Online/CICS Transaction Details) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 2776 >>
+stream
+BT
+/F1 9 Tf
+40 760 Td
+(----------------------------------) Tj
+0 -12 Td (Transaction ID | Program | Description | Users | Region) Tj
+0 -12 Td (               |         |             |       |) Tj
+0 -12 Td () Tj
+0 -12 Td (Include transaction purpose, screens/maps used, common user issues, security requirements, and) Tj
+0 -12 Td (restart/recovery steps.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (10. Programs and Components) Tj
+0 -12 Td (---------------------------) Tj
+0 -12 Td (Program/Module | Type             | Description | Input | Output) Tj
+0 -12 Td (               | COBOL/CICS/Batch |             |       |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (11. Database and File Details) Tj
+0 -12 Td (-----------------------------) Tj
+0 -12 Td () Tj
+0 -12 Td (11.1 DB2 Tables) Tj
+0 -12 Td (Table Name | Description | Read/Update/Delete | Criticality) Tj
+0 -12 Td (           |             |                    | High/Medium/Low) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (11.2 VSAM Files) Tj
+0 -12 Td (File Name | DD Name | Description | Access Type) Tj
+0 -12 Td (          |         |             | Read/Update) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (11.3 GDG/Flat Files) Tj
+0 -12 Td (File Name | Description | Retention | Used By) Tj
+0 -12 Td (          |             |           |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (12. Claim Processing Rules) Tj
+0 -12 Td (--------------------------) Tj
+0 -12 Td (Rule ID | Description | Program/Table | Expected Result) Tj
+0 -12 Td (        |             |               |) Tj
+0 -12 Td () Tj
+0 -12 Td (  ? Member must be active on date of service.) Tj
+0 -12 Td (  ? Provider must be valid and participating.) Tj
+0 -12 Td (  ? Duplicate claim check must be performed.) Tj
+0 -12 Td (  ? Benefit limits must be verified.) Tj
+0 -12 Td (  ? Prior authorization must be validated where applicable.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (13. Error Handling and Abend Resolution) Tj
+0 -12 Td (---------------------------------------) Tj
+0 -12 Td (Abend/Error Code | Cause                | Resolution                                     | Support Team) Tj
+0 -12 Td (S0C7             | Invalid numeric data | Check input claim data, correct, and reprocess | Application Support) Tj
+0 -12 Td (SB37             | Dataset space issue  | Increase space or contact storage team         | Mainframe Operations) Tj
+0 -12 Td (SQL -911         | DB2 deadlock/timeout | Retry job or contact DBA                       | DBA/Application) Tj
+0 -12 Td (Support) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (14. Restart and Recovery Procedures) Tj
+0 -12 Td (-----------------------------------) Tj
+0 -12 Td (Job Name | Restart Step | Conditions | Special Instructions) Tj
+0 -12 Td (         |              |            |) Tj
+0 -12 Td () Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 2885 >>
+stream
+BT
+/F1 9 Tf
+40 760 Td
+(  ? Document whether each job is restartable.) Tj
+0 -12 Td (  ? Identify whether files need to be backed out.) Tj
+0 -12 Td (  ? Identify whether DB2 updates need rollback.) Tj
+0 -12 Td (  ? Identify whether downstream jobs should be held.) Tj
+0 -12 Td (  ? List required approvals and notifications before restart.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (15. Monitoring Requirements) Tj
+0 -12 Td (---------------------------) Tj
+0 -12 Td (Item to Monitor      | Tool                   | Frequency | Alert Condition      | Action) Tj
+0 -12 Td (Batch job completion | Scheduler              | Daily     | Job failure/SLA miss | Notify support) Tj
+0 -12 Td (File arrival         | Scheduler/File monitor | Daily     | File not received    | Contact upstream) Tj
+0 -12 Td (DB2 errors           | Logs                   | Daily     | SQL failures         | Contact DBA) Tj
+0 -12 Td (Claim volume         | Report/Table           | Daily     | Unusual spike/drop   | Notify business) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (16. SLA and Critical Timelines) Tj
+0 -12 Td (------------------------------) Tj
+0 -12 Td (Process                 | SLA | Business Impact if Missed) Tj
+0 -12 Td (Claim intake            |     |) Tj
+0 -12 Td (Claim adjudication      |     |) Tj
+0 -12 Td (Payment file generation |     |) Tj
+0 -12 Td (Downstream reporting    |     |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (17. Upstream and Downstream Dependencies) Tj
+0 -12 Td (----------------------------------------) Tj
+0 -12 Td () Tj
+0 -12 Td (17.1 Upstream Systems) Tj
+0 -12 Td (System | Data Received                   | Frequency | Contact) Tj
+0 -12 Td (       | Claim file/member/provider data |           |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (17.2 Downstream Systems) Tj
+0 -12 Td (System | Data Sent                  | Frequency | Contact) Tj
+0 -12 Td (       | Payment/EOB/reporting data |           |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (18. Security and Access Requirements) Tj
+0 -12 Td (------------------------------------) Tj
+0 -12 Td (Access Type       | Required For               | Approval Needed From) Tj
+0 -12 Td (TSO/ISPF          | Mainframe support          |) Tj
+0 -12 Td (CICS Region       | Online transaction support |) Tj
+0 -12 Td (DB2 Read Access   | Issue analysis             |) Tj
+0 -12 Td (Scheduler Access  | Job monitoring/restart     |) Tj
+0 -12 Td (Endevor/Changeman | Code review                |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (19. Reports) Tj
+0 -12 Td (-----------) Tj
+0 -12 Td (Report Name | Description | Frequency | Location) Tj
+0 -12 Td (            |             |           |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (20. Known Issues and Limitations) Tj
+0 -12 Td (--------------------------------) Tj
+0 -12 Td (Issue | Impact | Workaround | Target Fix Date) Tj
+0 -12 Td (      |        |            |) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 2370 >>
+stream
+BT
+/F1 9 Tf
+40 760 Td
+() Tj
+0 -12 Td () Tj
+0 -12 Td (21. Production Deployment Details) Tj
+0 -12 Td (---------------------------------) Tj
+0 -12 Td (Item                    | Details) Tj
+0 -12 Td (Deployment Date         |) Tj
+0 -12 Td (Change Request Number   |) Tj
+0 -12 Td (Implementation Window   |) Tj
+0 -12 Td (Components Promoted     |) Tj
+0 -12 Td (DB2 Changes             |) Tj
+0 -12 Td (File Changes            |) Tj
+0 -12 Td (Scheduler Changes       |) Tj
+0 -12 Td (Backout Plan Available? | Yes/No) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (22. Backout Plan) Tj
+0 -12 Td (----------------) Tj
+0 -12 Td (  ? Programs to revert) Tj
+0 -12 Td (  ? JCL to revert) Tj
+0 -12 Td (  ? DB2 changes to back out) Tj
+0 -12 Td (  ? Files to restore) Tj
+0 -12 Td (  ? Scheduler changes to reverse) Tj
+0 -12 Td (  ? Validation steps after backout) Tj
+0 -12 Td (  ? Approvals required before backout) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (23. Validation After Production Deployment) Tj
+0 -12 Td (------------------------------------------) Tj
+0 -12 Td (Validation Step                    | Expected Result                | Owner) Tj
+0 -12 Td (Verify jobs completed successfully | No abends                      |) Tj
+0 -12 Td (Verify claim counts                | Match expected volume          |) Tj
+0 -12 Td (Verify DB2 table updates           | Records loaded correctly       |) Tj
+0 -12 Td (Verify output files                | Files created and transmitted  |) Tj
+0 -12 Td (Verify reports                     | Reports generated successfully |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (24. Support Procedures) Tj
+0 -12 Td (----------------------) Tj
+0 -12 Td () Tj
+0 -12 Td (24.1 Level 1 Support) Tj
+0 -12 Td (  ? Monitor batch jobs) Tj
+0 -12 Td (  ? Check file availability) Tj
+0 -12 Td (  ? Escalate abends) Tj
+0 -12 Td (  ? Notify business users of delays) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (24.2 Level 2 Support) Tj
+0 -12 Td (  ? Analyze job failures) Tj
+0 -12 Td (  ? Review logs and dumps) Tj
+0 -12 Td (  ? Restart jobs) Tj
+0 -12 Td (  ? Coordinate with DBA, operations, and business teams) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (24.3 Level 3 Support) Tj
+0 -12 Td (  ? Perform code-level analysis) Tj
+0 -12 Td (  ? Apply emergency fixes) Tj
+0 -12 Td (  ? Complete root cause analysis) Tj
+0 -12 Td (  ? Deliver permanent defect resolution) Tj
+ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 2168 >>
+stream
+BT
+/F1 9 Tf
+40 760 Td
+() Tj
+0 -12 Td () Tj
+0 -12 Td (25. Escalation Matrix) Tj
+0 -12 Td (---------------------) Tj
+0 -12 Td (Severity | Description                      | Response Time | Escalation Contact) Tj
+0 -12 Td (Sev 1    | Production outage/payment impact | Immediate     |) Tj
+0 -12 Td (Sev 2    | Critical batch failure/SLA risk  |               |) Tj
+0 -12 Td (Sev 3    | Non-critical issue               |               |) Tj
+0 -12 Td (Sev 4    | Inquiry/minor issue              |               |) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (26. Frequently Asked Questions) Tj
+0 -12 Td (------------------------------) Tj
+0 -12 Td (Question                            | Answer) Tj
+0 -12 Td (What if claim file is not received? | Check file monitor and contact upstream team.) Tj
+0 -12 Td (What if adjudication job abends?    | Review job log, identify error, and follow restart procedure.) Tj
+0 -12 Td (What if claim counts do not match?  | Compare input, staging, and output counts; escalate to application) Tj
+0 -12 Td (support.) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (27. Attachments) Tj
+0 -12 Td (---------------) Tj
+0 -12 Td (  ? Technical design document) Tj
+0 -12 Td (  ? Functional design document) Tj
+0 -12 Td (  ? Test summary report) Tj
+0 -12 Td (  ? UAT approval) Tj
+0 -12 Td (  ? Implementation plan) Tj
+0 -12 Td (  ? Backout plan) Tj
+0 -12 Td (  ? Job flow diagram) Tj
+0 -12 Td (  ? Data mapping document) Tj
+0 -12 Td (  ? DB2 table layout) Tj
+0 -12 Td (  ? File layouts) Tj
+0 -12 Td (  ? Abend resolution guide) Tj
+0 -12 Td (  ? Contact list) Tj
+0 -12 Td (  ? Sample input/output files) Tj
+0 -12 Td (  ? Sample reports) Tj
+0 -12 Td () Tj
+0 -12 Td () Tj
+0 -12 Td (28. Sign-Off) Tj
+0 -12 Td (------------) Tj
+0 -12 Td (Role                    | Name | Signature/Approval | Date) Tj
+0 -12 Td (Business Owner          |      |                    |) Tj
+0 -12 Td (Application Owner       |      |                    |) Tj
+0 -12 Td (Production Support Lead |      |                    |) Tj
+0 -12 Td (QA Lead                 |      |                    |) Tj
+0 -12 Td (Release Manager         |      |                    |) Tj
+0 -12 Td () Tj
+ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 14 0 R >>
+endobj
+xref
+0 16
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000148 00000 n 
+0000000218 00000 n 
+0000002650 00000 n 
+0000002776 00000 n 
+0000005530 00000 n 
+0000005656 00000 n 
+0000008484 00000 n 
+0000008610 00000 n 
+0000011548 00000 n 
+0000011676 00000 n 
+0000014099 00000 n 
+0000014227 00000 n 
+0000016448 00000 n 
+trailer
+<< /Size 16 /Root 1 0 R >>
+startxref
+16576
+%%EOF
